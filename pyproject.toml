@@ -1,0 +1,19 @@
+[project]
+name = "documentinfo"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "llama-parse>=0.1.0",
+    "transformers>=4.40.0",
+    "langchain-text-splitters>=0.3.0",
+    "pytest>=8.0.0",
+    "openai>=1.0.0",
+    "respx>=0.21.0",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests that exercise a real external API or a near-real smoke path",
+]
