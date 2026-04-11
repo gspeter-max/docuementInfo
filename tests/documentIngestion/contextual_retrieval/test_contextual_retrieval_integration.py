@@ -1,25 +1,26 @@
+import asyncio
 import pytest
 import respx
 from httpx import Response
+from openai import APIStatusError
 
-from src.config import lightning_api_key
+from src.config import mistral_api_key
 from src.documentIngestion.contextual_retrieval import (
-    build_contextualized_document,
-    build_lightning_client,
+    build_mistral_client,
     generate_chunk_context,
 )
 
 
 @respx.mock
 def test_generate_chunk_context_with_realistic_openai_shape():
-    route = respx.post("https://lightning.ai/api/v1/chat/completions").mock(
+    route = respx.post("https://api.mistral.ai/v1/chat/completions").mock(
         return_value=Response(
             200,
             json={
                 "id": "chatcmpl-test",
                 "object": "chat.completion",
                 "created": 1234567890,
-                "model": "lightning-ai/gpt-oss-120b",
+                "model": "mistral-small-latest",
                 "choices": [
                     {
                         "index": 0,
@@ -34,7 +35,7 @@ def test_generate_chunk_context_with_realistic_openai_shape():
         )
     )
 
-    client = build_lightning_client(api_key="test-key")
+    client = asyncio.run(build_mistral_client(api_key="test-key"))
     chunk = {
         "chunk_index": 0,
         "text": "Built search pipelines.",
@@ -42,11 +43,13 @@ def test_generate_chunk_context_with_realistic_openai_shape():
         "document_id": "resume.pdf",
     }
 
-    result = generate_chunk_context(
-        client=client,
-        full_document_text="full document text",
-        chunk=chunk,
-        model="lightning-ai/gpt-oss-120b",
+    result = asyncio.run(
+        generate_chunk_context(
+            client=client,
+            full_document_text="full document text",
+            chunk=chunk,
+            model="mistral-small-latest",
+        )
     )
 
     assert route.called
@@ -54,17 +57,12 @@ def test_generate_chunk_context_with_realistic_openai_shape():
     assert result["contextualized_text"].startswith("This chunk is part of the work experience section.")
 
 
-def test_build_lightning_client_requires_key():
-    with pytest.raises(EnvironmentError):
-        build_lightning_client(api_key="")
-
-
 @pytest.mark.integration
-def test_real_lightning_smoke():
-    if not lightning_api_key:
-        pytest.skip("LIGHTNING_API_KEY is not configured in src.config")
+def test_real_mistral_smoke():
+    if not mistral_api_key or mistral_api_key.lower() in {"test", "test-key", "dummy", "placeholder"}:
+        pytest.skip("MISTRAL_API_KEY is not configured with a real value in src.config")
 
-    client = build_lightning_client(api_key=lightning_api_key)
+    client = asyncio.run(build_mistral_client(api_key=mistral_api_key))
     chunk = {
         "chunk_index": 0,
         "text": "Experience: built and operated search systems.",
@@ -72,12 +70,19 @@ def test_real_lightning_smoke():
         "document_id": "resume.pdf",
     }
 
-    result = generate_chunk_context(
-        client=client,
-        full_document_text="Full document text goes here.",
-        chunk=chunk,
-        model="lightning-ai/gpt-oss-120b",
-    )
+    try:
+        result = asyncio.run(
+            generate_chunk_context(
+                client=client,
+                full_document_text="Full document text goes here.",
+                chunk=chunk,
+                model="mistral-small-latest",
+            )
+        )
 
-    assert isinstance(result["context"], str)
-    assert result["context"].strip() != ""
+        assert isinstance(result["context"], str)
+        assert result["context"].strip() != ""
+    except APIStatusError as exc:
+        if getattr(exc, "status_code", None) == 402:
+            pytest.skip("Mistral account has no credits for the live smoke test")
+        raise

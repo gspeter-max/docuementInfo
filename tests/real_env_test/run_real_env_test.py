@@ -11,6 +11,7 @@ report to tests/real_env_test/real_env_test_results/.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import sys
@@ -22,8 +23,8 @@ from pathlib import Path
 # if _project_root not in sys.path:
 #     sys.path.insert(0, _project_root)
 
-from src.config import lightning_api_key
-from src.documentIngestion.contextual_retrieval import build_contextualized_document, build_lightning_client
+from src.config import mistral_api_key
+from src.documentIngestion.contextual_retrieval import build_contextualized_document, build_mistral_client
 
 
 def main() -> int:
@@ -43,13 +44,15 @@ def main() -> int:
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if not lightning_api_key:
-        raise EnvironmentError("LIGHTNING_API_KEY is not configured in src.config")
+    if not mistral_api_key:
+        raise EnvironmentError("MISTRAL_API_KEY is not configured in src.config")
 
-    client = build_lightning_client(api_key=lightning_api_key)
-    report = build_contextualized_document(
-        file_path=str(pdf_path),
-        client=client,
+    client = asyncio.run(build_mistral_client(api_key=mistral_api_key))
+    report = asyncio.run(
+        build_contextualized_document(
+            file_path=str(pdf_path),
+            client=client,
+        )
     )
     report["created_at"] = datetime.now(timezone.utc).isoformat()
     report["input_pdf"] = str(pdf_path)
