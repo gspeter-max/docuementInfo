@@ -1,14 +1,14 @@
-from neo4j import GraphDatabase
+from neo4j import AsyncGraphDatabase
+
 
 class Neo4jClient:
-    def __init__(self, uri, user, password):
-        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+    def __init__(self, uri: str, user: str, password: str):
+        self.driver = AsyncGraphDatabase.driver(uri, auth=(user, password))
 
-    def close(self):
-        self.driver.close()
+    async def close(self):
+        await self.driver.close()
 
-    def execute_query(self, query, parameters=None):
-        with self.driver.session() as session:
-            result = session.run(query, parameters)
-            return result
-
+    async def execute_query(self, query: str, parameters: dict | None = None) -> list[dict]:
+        async with self.driver.session() as session:
+            result = await session.run(query, parameters or {})
+            return await result.data()

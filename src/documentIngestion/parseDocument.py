@@ -15,14 +15,14 @@ import sys
 # os.path.dirname(...dirname(...dirname(...))) →  .../documentInFo   ← PROJECT ROOT
 # ---------------------------------------------------------------------------
 # We insert the project root at position 0 (highest priority) so that
-# "from src.config import ..." resolves to documentInFo/src/config.py
+# "from config import ..." resolves to documentInFo/src/config.py
 # ---------------------------------------------------------------------------
 # _project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # if _project_root not in sys.path:
 #     sys.path.insert(0, _project_root)
 
 from llama_parse import LlamaParse
-from src.config import llama_parse_api_key
+from config import llama_parse_api_key
 
 def _build_parser() -> LlamaParse:
     """

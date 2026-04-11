@@ -7,24 +7,31 @@ Usage:
 This script parses a real PDF, chunks the extracted text, and writes a JSON
 report to tests/real_env_test/real_env_test_results/.
 """
-
 from __future__ import annotations
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+
+from llama_index.core.instrumentation.events import embedding
 
 import argparse
-import asyncio
 import json
-import os
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from documentIngestion.ingestion import ingest_document
+from documentIngestion.models.ingestionModels import ingestionRequest
+import asyncio
+
+
 
 # Make the project root visible when this script is run directly.
 # _project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # if _project_root not in sys.path:
 #     sys.path.insert(0, _project_root)
 
-from src.config import mistral_api_key
-from src.documentIngestion.contextual_retrieval import build_contextualized_document, build_mistral_client
+from config import mistral_api_key
+from documentIngestion.contextual_retrieval import build_contextualized_document, build_mistral_client
 
 
 def main() -> int:
@@ -47,18 +54,9 @@ def main() -> int:
     if not mistral_api_key:
         raise EnvironmentError("MISTRAL_API_KEY is not configured in src.config")
 
-    client = asyncio.run(build_mistral_client(api_key=mistral_api_key))
-    report = asyncio.run(
-        build_contextualized_document(
-            file_path=str(pdf_path),
-            client=client,
-        )
-    )
-    report["created_at"] = datetime.now(timezone.utc).isoformat()
-    report["input_pdf"] = str(pdf_path)
-
-    output_path = output_dir / f"{pdf_path.stem}_contextualized.json"
-    output_path.write_text(json.dumps(report, indent=2, ensure_ascii=True), encoding="utf-8")
+    ingestion_request = ingestionRequest(file_path=str(pdf_path))
+    result = asyncio.run(ingest_document(ingestion_request))
+    print(f'result : {result}')
 
     # print(f"Wrote report to: {output_path}")
     # print(f"Chunks: {report['chunk_count']}")

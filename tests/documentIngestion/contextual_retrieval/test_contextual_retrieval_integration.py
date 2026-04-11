@@ -4,12 +4,12 @@ import respx
 from httpx import Response
 from openai import APIStatusError
 
-from src.config import mistral_api_key
-from src.documentIngestion.contextual_retrieval import (
-    build_mistral_client,
+from config import mistral_api_key
+from documentIngestion.contextual_retrieval import (
     generate_chunk_context,
 )
 
+from providers.llmProvider import build_mistral_client
 
 @respx.mock
 def test_generate_chunk_context_with_realistic_openai_shape():

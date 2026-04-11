@@ -14,27 +14,9 @@ from typing import Any
 
 import asyncio
 from openai import AsyncOpenAI
-from src.config import mistral_api_key
-from src.documentIngestion.chunking import chunk_document
-from src.documentIngestion.parseDocument import get_all_pages_text, parse_document
-
-MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
-DEFAULT_MODEL = "mistral-small-latest"
-
-
-async def build_mistral_client(
-    api_key: str | None = None,
-    base_url: str = MISTRAL_BASE_URL,
-) -> AsyncOpenAI:
-    resolved_api_key = (api_key or mistral_api_key or "").strip()
-    if not resolved_api_key:
-        raise EnvironmentError(
-            "MISTRAL_API_KEY is not set. "
-            "Set it in your .env file, expose it from src.config, or pass it explicitly."
-        )
-
-    return AsyncOpenAI(api_key=resolved_api_key, base_url=base_url)
-
+from documentIngestion.chunking import chunk_document
+from documentIngestion.parseDocument import get_all_pages_text, parse_document
+from providers.llmProvider import build_mistral_client , DEFAULT_MODEL
 
 async def  build_context_messages(full_document_text: str, chunk: dict[str, Any]) -> list[dict[str, str]]:
     return [
