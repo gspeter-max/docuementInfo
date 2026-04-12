@@ -7,3 +7,6 @@ class ingestionRequest(BaseModel):
 class ingestionResponse(BaseModel):
     status: str
     message: str
+    raw_entity_count: int = 0
+    canonical_entity_count: int = 0
+    relationship_count: int = 0
