@@ -8,6 +8,7 @@ dependencies = [
     "llama-parse>=0.1.0",
     "transformers>=4.40.0",
     "langchain-text-splitters>=0.3.0",
+    "rapidfuzz>=3.9.0",
     "pytest>=8.0.0",
     "openai>=1.0.0",
     "respx>=0.21.0",

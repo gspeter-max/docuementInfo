@@ -37,3 +37,15 @@ class embeddingModel:
                 raise Exception(f"Error generating embedding: {response.status_code}")
             
             return response.json()["data"][0]["embedding"]
+
+    async def generate_embeddings_for_text_list(self, texts: list[str]) -> list[list[float]]:
+        """This turns a list of words into a list of numbers all at once. These numbers help us understand what the words mean so we can find similar words later."""
+        data = {
+            "model": self.embedModel,
+            "task": "retrieval.query",
+            "input": texts,
+        }
+        response = requests.post(self.url, headers=self.headers, data=json.dumps(data))
+        response.raise_for_status()
+        response_payload = response.json()
+        return [row["embedding"] for row in response_payload["data"]]
