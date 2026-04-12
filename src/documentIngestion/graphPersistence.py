@@ -42,3 +42,40 @@ def merge_duplicate_relationship_payloads(
         )
         merged_relationships_by_key.setdefault(relationship_key, relationship_payload)
     return list(merged_relationships_by_key.values())
+
+
+def build_neo4j_graph_write_payload(
+    document_id: str,
+    canonical_entities: list[dict[str, Any]],
+    rewritten_relationships: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """This function packages up all the deduplicated entities, their mentions, and deduplicated relationships for saving."""
+    unique_entities = {}
+    mentions = []
+    
+    for entity in canonical_entities:
+        canonical_name = entity["canonical_name"]
+        if canonical_name not in unique_entities:
+            unique_entities[canonical_name] = {
+                "canonical_name": canonical_name,
+                "entity_type": entity["entity_type"]
+            }
+        
+        mentions.append({
+            "canonical_name": canonical_name,
+            "document_id": document_id,
+            "chunk_id": entity["chunk_id"],
+            "evidence_text": entity["evidence_text"],
+        })
+        
+    for rel in rewritten_relationships:
+        rel["document_id"] = document_id
+        
+    merged_relationships = merge_duplicate_relationship_payloads(rewritten_relationships)
+
+    return {
+        "document_id": document_id,
+        "entities": list(unique_entities.values()),
+        "mentions": mentions,
+        "relationships": merged_relationships,
+    }

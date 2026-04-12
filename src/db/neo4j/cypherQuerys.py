@@ -58,6 +58,53 @@ async def save_chunk(
     })
 
 
+ENTITY_WRITE_QUERY = """
+UNWIND $entities AS entity_row
+MERGE (e:Entity {canonical_name: entity_row.canonical_name})
+SET e.entity_type = entity_row.entity_type
+"""
+
+MENTION_WRITE_QUERY = """
+UNWIND $mentions AS mention_row
+MATCH (e:Entity {canonical_name: mention_row.canonical_name})
+MATCH (c:Chunk {chunk_id: mention_row.chunk_id})
+MERGE (e)-[m:MENTIONED_IN]->(c)
+SET m.document_id = mention_row.document_id,
+    m.evidence_text = mention_row.evidence_text
+"""
+
+RELATIONSHIP_WRITE_QUERY = """
+UNWIND $relationships AS relationship_row
+MATCH (source:Entity {canonical_name: relationship_row.source_entity_name})
+MATCH (target:Entity {canonical_name: relationship_row.target_entity_name})
+MERGE (source)-[relationship:RELATES_TO {
+    relationship_type: relationship_row.relationship_type,
+    document_id: relationship_row.document_id,
+    chunk_id: relationship_row.chunk_id
+}]->(target)
+SET relationship.evidence_text = relationship_row.evidence_text
+"""
+
+
+async def save_document_node(client: Neo4jClient, document_id: str, source_file: str) -> None:
+    """This saves the main document file name into our database so we can link everything back to it."""
+    query = """
+    MERGE (document:Document {document_id: $document_id})
+    SET document.source_file = $source_file
+    """
+    await client.execute_query(query, {"document_id": document_id, "source_file": source_file})
+
+
+async def save_entity_nodes_and_relationships(
+    client: Neo4jClient,
+    graph_write_payload: dict[str, Any],
+) -> None:
+    """This function saves all the best names and how they connect into our graph database, so we can search through them later."""
+    await client.execute_query(ENTITY_WRITE_QUERY, {"entities": graph_write_payload["entities"]})
+    await client.execute_query(MENTION_WRITE_QUERY, {"mentions": graph_write_payload["mentions"]})
+    await client.execute_query(RELATIONSHIP_WRITE_QUERY, {"relationships": graph_write_payload["relationships"]})
+
+
 # ─── Read ─────────────────────────────────────────────────────────────────────
 
 async def retrieve_similar_chunks(

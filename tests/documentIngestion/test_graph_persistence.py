@@ -28,3 +28,31 @@ def test_rewrite_graph_results_to_canonical_entities_handles_missing_mappings():
     rewritten = rewrite_graph_results_to_canonical_entities(raw_results, canonical_name_map)
 
     assert rewritten.entities[0]["canonical_name"] == "Unknown Person"
+
+
+def test_build_neo4j_graph_write_payload_contains_mentions_and_relationships():
+    """This test makes sure that the package of data we send to the database contains all the names, where they were mentioned, and how they connect."""
+    from src.documentIngestion.graphPersistence import build_neo4j_graph_write_payload
+    payload = build_neo4j_graph_write_payload(
+        document_id="resume.pdf",
+        canonical_entities=[{"canonical_name": "Elon Musk", "entity_type": "Person", "chunk_id": "doc::0", "evidence_text": "Elon spoke"}],
+        rewritten_relationships=[{"source_entity_name": "Elon Musk", "relationship_type": "RELATED_TO", "target_entity_name": "Tesla", "evidence_text": "Elon leads Tesla", "chunk_id": "doc::0"}],
+    )
+
+    assert payload["document_id"] == "resume.pdf"
+    assert payload["relationships"][0]["relationship_type"] == "RELATED_TO"
+    assert payload["mentions"][0]["chunk_id"] == "doc::0"
+
+def test_build_neo4j_graph_write_payload_deduplicates_entities():
+    """Edge case: ensure entities are deduplicated by canonical name in the payload."""
+    from src.documentIngestion.graphPersistence import build_neo4j_graph_write_payload
+    payload = build_neo4j_graph_write_payload(
+        document_id="doc.pdf",
+        canonical_entities=[
+            {"canonical_name": "A", "entity_type": "Person", "chunk_id": "1", "evidence_text": "e1"},
+            {"canonical_name": "A", "entity_type": "Person", "chunk_id": "2", "evidence_text": "e2"}
+        ],
+        rewritten_relationships=[]
+    )
+    assert len(payload["entities"]) == 1
+    assert len(payload["mentions"]) == 2
