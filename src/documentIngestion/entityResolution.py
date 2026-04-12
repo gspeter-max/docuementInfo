@@ -1,4 +1,11 @@
+import json
+from pathlib import Path
+from typing import Any
+from openai import AsyncOpenAI
 from rapidfuzz import fuzz
+
+from src.documentIngestion.models.graphExtractionModels import EntityResolutionDecision
+from src.providers.llmProvider import DEFAULT_MODEL
 
 
 def group_entities_by_normalized_name(raw_entity_names: list[str]) -> dict[str, list[str]]:
@@ -39,3 +46,61 @@ def split_clear_cases_from_ambiguous_cases(
             different_entity_pairs.append((left, right, score))
             
     return same_entity_pairs, ambiguous_pairs, different_entity_pairs
+
+
+def build_entity_resolution_review_payload(ambiguous_pairs: list[tuple[str, str, float]]) -> dict[str, Any]:
+    """This makes sure we only send the confusing pairs of names to the AI for review."""
+    return {
+        "ambiguous_pairs": [
+            {
+                "left_name": pair[0],
+                "right_name": pair[1],
+                "similarity_score": pair[2],
+            }
+            for pair in ambiguous_pairs
+        ]
+    }
+
+
+def build_entity_resolution_messages(payload: dict[str, Any]) -> list[dict[str, str]]:
+    """This function gets the right files with instructions to ask the AI if two names are the same."""
+    prompts_dir = Path(__file__).parent / "prompts" / "graph"
+    system_prompt = (prompts_dir / "resolution_system.md").read_text(encoding="utf-8")
+    user_prompt_template = (prompts_dir / "resolution_user.md").read_text(encoding="utf-8")
+
+    return [
+        {
+            "role": "system",
+            "content": system_prompt,
+        },
+        {
+            "role": "user",
+            "content": user_prompt_template.format(
+                payload_json=json.dumps(payload, indent=2)
+            ),
+        },
+    ]
+
+
+async def resolve_ambiguous_entity_pairs(
+    *,
+    llm_client: AsyncOpenAI,
+    ambiguous_pairs: list[tuple[str, str, float]],
+    model: str = DEFAULT_MODEL,
+) -> list[EntityResolutionDecision]:
+    """This function asks the AI to look at pairs of names we are confused about, and decide if they are the same thing or different things."""
+    if not ambiguous_pairs:
+        return []
+        
+    payload = build_entity_resolution_review_payload(ambiguous_pairs)
+    response = await llm_client.chat.completions.create(
+        model=model,
+        messages=build_entity_resolution_messages(payload),
+        temperature=0.0,
+        response_format={"type": "json_object"},
+    )
+    response_payload = json.loads(response.choices[0].message.content or "{}")
+    return [
+        EntityResolutionDecision(**decision_row)
+        for decision_row in response_payload.get("decisions", [])
+    ]

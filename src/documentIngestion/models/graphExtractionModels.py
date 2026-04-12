@@ -34,3 +34,21 @@ class ChunkGraphExtractionResult(BaseModel):
 
     entities: list[RawGraphEntity] = Field(default_factory=list)
     relationships: list[RawGraphRelationship] = Field(default_factory=list)
+
+
+class AmbiguousEntityPairForResolution(BaseModel):
+    """This holds two names that look a bit similar but we are not completely sure if they are the same thing, so we need to ask the AI to decide."""
+
+    left_name: str
+    right_name: str
+    similarity_score: float
+
+
+class EntityResolutionDecision(BaseModel):
+    """This is the final answer from the AI about whether two names mean the same thing, and what the best name to use for both of them is."""
+
+    left_name: str
+    right_name: str
+    should_merge: bool
+    canonical_name: str
+    aliases: list[str] = Field(default_factory=list)
