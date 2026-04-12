@@ -1,0 +1,44 @@
+from typing import Any
+
+from src.documentIngestion.models.graphExtractionModels import ChunkGraphExtractionResult, CanonicalGraphPersistencePayload
+
+
+def rewrite_graph_results_to_canonical_entities(
+    raw_chunk_graph_results: list[ChunkGraphExtractionResult],
+    canonical_name_by_raw_name: dict[str, str],
+) -> CanonicalGraphPersistencePayload:
+    """This function takes all the names we found and changes them to the single best name we chose for them, so we can save them correctly."""
+    rewritten_entities = []
+    rewritten_relationships = []
+    for chunk_graph_result in raw_chunk_graph_results:
+        for entity in chunk_graph_result.entities:
+            rewritten_entities.append({
+                "canonical_name": canonical_name_by_raw_name.get(entity.entity_name, entity.entity_name),
+                "entity_type": entity.entity_type,
+                "chunk_id": entity.chunk_id,
+                "evidence_text": entity.evidence_text,
+            })
+        for relationship in chunk_graph_result.relationships:
+            rewritten_relationships.append({
+                "source_entity_name": canonical_name_by_raw_name.get(relationship.source_entity_name, relationship.source_entity_name),
+                "relationship_type": relationship.relationship_type,
+                "target_entity_name": canonical_name_by_raw_name.get(relationship.target_entity_name, relationship.target_entity_name),
+                "chunk_id": relationship.chunk_id,
+                "evidence_text": relationship.evidence_text,
+            })
+    return CanonicalGraphPersistencePayload(entities=rewritten_entities, relationships=rewritten_relationships)
+
+
+def merge_duplicate_relationship_payloads(
+    relationship_payloads: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """This function takes many identical connections and squishes them into one, making sure we remember all the places we found them."""
+    merged_relationships_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for relationship_payload in relationship_payloads:
+        relationship_key = (
+            relationship_payload["source_entity_name"],
+            relationship_payload["relationship_type"],
+            relationship_payload["target_entity_name"],
+        )
+        merged_relationships_by_key.setdefault(relationship_key, relationship_payload)
+    return list(merged_relationships_by_key.values())

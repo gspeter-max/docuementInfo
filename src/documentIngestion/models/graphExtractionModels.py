@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
+from typing import Any
 
 
 class RawGraphEntity(BaseModel):
@@ -52,3 +53,12 @@ class EntityResolutionDecision(BaseModel):
     should_merge: bool
     canonical_name: str
     aliases: list[str] = Field(default_factory=list)
+
+
+class CanonicalGraphPersistencePayload(BaseModel):
+    """Holds rewritten canonical entities and relationships before saving."""
+    
+    entities: list[dict[str, Any]]
+    relationships: list[dict[str, Any]]
+    mentions: list[dict[str, Any]] = Field(default_factory=list)
+    document_id: str = ""
