@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 
 _project_root = Path(__file__).resolve().parents[1]
-load_dotenv(_project_root / ".env")
+load_dotenv(_project_root / ".env", override=True)
 
 llama_parse_api_key = os.environ.get("LLAMA_PARSE_APIKEY", "").strip()
 jina_api_key = os.environ.get("JINA_API_KEY", "").strip()

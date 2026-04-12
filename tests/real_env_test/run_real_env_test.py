@@ -10,10 +10,14 @@ report to tests/real_env_test/real_env_test_results/.
 from __future__ import annotations
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+project_root = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(project_root / "src"))
+sys.path.insert(0, str(project_root))
 
+import src  # This triggers structlog.configure in src/__init__.py
+import structlog
 
-from llama_index.core.instrumentation.events import embedding
+log = structlog.get_logger(__name__)
 
 import argparse
 import json
@@ -55,8 +59,9 @@ def main() -> int:
         raise EnvironmentError("MISTRAL_API_KEY is not configured in src.config")
 
     ingestion_request = ingestionRequest(file_path=str(pdf_path))
+    log.info("Starting ingestion via run_real_env_test", pdf_path=str(pdf_path))
     result = asyncio.run(ingest_document(ingestion_request))
-    print(f'result : {result}')
+    log.info("Ingestion completed", result=str(result))
 
     # print(f"Wrote report to: {output_path}")
     # print(f"Chunks: {report['chunk_count']}")

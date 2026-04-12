@@ -1,12 +1,15 @@
 import requests
 import json 
 import asyncio 
+import structlog
+
+log = structlog.get_logger(__name__)
 
 class embeddingModel:
     def __init__(self, 
         api_key: str, 
         base_url : str = "https://api.jina.ai/v1/embeddings", 
-        embeddingModel : str = "jina-embeddings-v2-small-en",
+        embeddingModel : str = "jina-embeddings-v2-base-en",
         max_concurrency : int = 10
     ):
         self.headers = {
@@ -23,7 +26,6 @@ class embeddingModel:
             data = {
                 "model" : self.embedModel,
                 "task" : "retrieval.query",
-                "normalized" : True,
                 "input" : [
                     text 
                 ]
@@ -31,6 +33,7 @@ class embeddingModel:
 
             response = requests.post(self.url, headers=self.headers, data = json.dumps(data))
             if response.status_code != 200:
+                log.error("Jina API error", status_code=response.status_code, response_text=response.text)
                 raise Exception(f"Error generating embedding: {response.status_code}")
             
             return response.json()["data"][0]["embedding"]
