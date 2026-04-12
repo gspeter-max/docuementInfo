@@ -35,3 +35,54 @@ def test_raw_graph_entity_rejects_empty_evidence_text():
             chunk_id="doc::0",
             evidence_text="",
         )
+
+from src.documentIngestion.graphExtraction import parse_chunk_graph_extraction_response
+
+
+def test_parse_chunk_graph_extraction_response_returns_entities_and_relationships():
+    """This test checks if we can correctly understand the answer the AI gives us and pull out the names and connections from it."""
+    response_payload = {
+        "entities": [
+            {
+                "entity_name": "Alice",
+                "entity_type": "Person",
+                "chunk_id": "resume.pdf::0",
+                "evidence_text": "Alice works at Neo4j.",
+            }
+        ],
+        "relationships": [
+            {
+                "source_entity_name": "Alice",
+                "relationship_type": "RELATED_TO",
+                "target_entity_name": "Neo4j",
+                "evidence_text": "Alice works at Neo4j.",
+                "chunk_id": "resume.pdf::0",
+            }
+        ],
+    }
+
+    result = parse_chunk_graph_extraction_response(response_payload)
+
+    assert result.entities[0].entity_name == "Alice"
+    assert result.relationships[0].relationship_type == "RELATED_TO"
+
+import pydantic
+
+def test_parse_chunk_graph_extraction_handles_missing_keys():
+    """This test makes sure that if the AI gives us a bad dictionary missing keys, we throw a validation error."""
+    response_payload = {
+        "entities": [{"entity_name": "Alice"}],
+        "relationships": []
+    }
+    with pytest.raises(pydantic.ValidationError):
+        parse_chunk_graph_extraction_response(response_payload)
+
+def test_parse_chunk_graph_extraction_handles_empty_lists():
+    """This test makes sure we handle empty lists gracefully when nothing is found."""
+    response_payload = {
+        "entities": [],
+        "relationships": []
+    }
+    result = parse_chunk_graph_extraction_response(response_payload)
+    assert len(result.entities) == 0
+    assert len(result.relationships) == 0

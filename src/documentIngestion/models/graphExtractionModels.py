@@ -27,3 +27,10 @@ class RawGraphRelationship(BaseModel):
         if value not in ALLOWED_RELATIONSHIP_TYPES:
             raise ValueError(f"Unsupported relationship type: {value}")
         return value
+
+
+class ChunkGraphExtractionResult(BaseModel):
+    """This holds all the names and connections we found in one small piece of text."""
+
+    entities: list[RawGraphEntity] = Field(default_factory=list)
+    relationships: list[RawGraphRelationship] = Field(default_factory=list)
