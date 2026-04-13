@@ -184,6 +184,6 @@ def test_validation_expected_load_is_captured(monkeypatch):
 
 
 def test_validation_build_mistral_client_requires_key_when_config_is_empty(monkeypatch):
-    monkeypatch.setattr(module, "mistral_api_key", "")
+    monkeypatch.setattr("providers.llmProvider.mistral_api_key", "")
     with pytest.raises(EnvironmentError):
         asyncio.run(build_mistral_client(api_key=""))
