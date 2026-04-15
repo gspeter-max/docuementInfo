@@ -50,7 +50,7 @@ async def save_chunk(
         c.embedding   = $embedding
     """
     await client.execute_query(query, {
-        "chunk_id":    chunk["chunk_index"],
+        "chunk_id":    chunk["chunk_id"],
         "text":        chunk["text"],
         "context":     chunk["context"],
         "document_id": chunk["document_id"],

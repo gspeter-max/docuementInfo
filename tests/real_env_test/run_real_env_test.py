@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import asyncio
 import sys
 from pathlib import Path
+from typing import Any
 
 project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root / "src"))
@@ -14,7 +15,8 @@ sys.path.insert(0, str(project_root))
 import src  # This triggers structlog.configure in src/__init__.py
 import structlog
 
-from config import mistral_api_key
+from config import mistral_api_key, neo4j_uri, neo4j_user, neo4j_password
+from db.neo4j import Neo4jClient
 from documentIngestion.contextual_retrieval import build_contextualized_document, build_mistral_client
 from documentIngestion.ingestion import (
     build_contextualized_chunk_embeddings,
@@ -48,6 +50,7 @@ def build_report_payload(
     document_id: str,
     chunk_count: int,
     relationship_count: int,
+    verification_report: dict[str, Any] | None = None,
     output_path: Path,
 ) -> dict[str, object]:
     return {
@@ -57,8 +60,65 @@ def build_report_payload(
         "document_id": document_id,
         "chunk_count": chunk_count,
         "relationship_count": relationship_count,
+        "verification_report": verification_report,
         "output_path": str(output_path),
     }
+
+
+async def verify_database_persistence(document_id: str) -> dict[str, Any]:
+    """Connect to Neo4j and verify what was actually saved for this document."""
+    log.info("Starting database verification", document_id=document_id)
+    verification_results = {
+        "chunks_in_db": 0,
+        "relationships_in_db": 0,
+        "mentions_in_db": 0,
+        "sample_relationships": [],
+        "neo4j_status": "disconnected"
+    }
+    
+    client = Neo4jClient(neo4j_uri, neo4j_user, neo4j_password)
+    try:
+        # 1. Count Chunks
+        chunk_query = "MATCH (c:Chunk {document_id: $doc_id}) RETURN count(c) as count"
+        chunk_data = await client.execute_query(chunk_query, {"doc_id": document_id})
+        verification_results["chunks_in_db"] = chunk_data[0]["count"] if chunk_data else 0
+        
+        # 2. Count Relationships
+        rel_query = "MATCH ()-[r:RELATES_TO {document_id: $doc_id}]->() RETURN count(r) as count"
+        rel_data = await client.execute_query(rel_query, {"doc_id": document_id})
+        verification_results["relationships_in_db"] = rel_data[0]["count"] if rel_data else 0
+        
+        # 3. Count Mentions
+        mention_query = "MATCH ()-[r:MENTIONED_IN {document_id: $doc_id}]->() RETURN count(r) as count"
+        mention_data = await client.execute_query(mention_query, {"doc_id": document_id})
+        verification_results["mentions_in_db"] = mention_data[0]["count"] if mention_data else 0
+        
+        # 4. Sample some relationships with metadata
+        sample_query = """
+        MATCH (s:Entity)-[r:RELATES_TO {document_id: $doc_id}]->(t:Entity)
+        RETURN 
+            s.canonical_name as source, 
+            r.relationship_type as type, 
+            t.canonical_name as target, 
+            r.evidence_text as evidence,
+            r.chunk_id as chunk_id
+        LIMIT 5
+        """
+        sample_data = await client.execute_query(sample_query, {"doc_id": document_id})
+        verification_results["sample_relationships"] = sample_data
+        verification_results["neo4j_status"] = "connected"
+        
+        log.info("Database verification complete", 
+                 chunks=verification_results["chunks_in_db"], 
+                 relationships=verification_results["relationships_in_db"])
+                 
+    except Exception as e:
+        log.error("Database verification failed", error=str(e))
+        verification_results["neo4j_status"] = f"error: {str(e)}"
+    finally:
+        await client.close()
+        
+    return verification_results
 
 
 async def run_pipeline_step_by_step(pdf_path: Path, output_dir: Path) -> Path:
@@ -69,6 +129,7 @@ async def run_pipeline_step_by_step(pdf_path: Path, output_dir: Path) -> Path:
     document_id = ""
     chunk_count = 0
     relationship_count = 0
+    verification_report = None
     report_path = output_dir / f"{pdf_path.stem}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
     current_stage = "startup"
 
@@ -111,6 +172,10 @@ async def run_pipeline_step_by_step(pdf_path: Path, output_dir: Path) -> Path:
         relationship_count = len(clean_graph.relationships)
         await persist_document_graph(document_data, embeddings_list, clean_graph)
         log.info("Graph persistence complete")
+
+        current_stage = "database_verification"
+        verification_report = await verify_database_persistence(document_id)
+
     except Exception as exc:
         status = "error"
         failed_stage = current_stage
@@ -124,6 +189,7 @@ async def run_pipeline_step_by_step(pdf_path: Path, output_dir: Path) -> Path:
         document_id=document_id,
         chunk_count=chunk_count,
         relationship_count=relationship_count,
+        verification_report=verification_report,
         output_path=report_path,
     )
     report_path = write_report(report_path, report_payload)
