@@ -1,9 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Any
-import structlog
-
-log = structlog.get_logger(__name__)
-
+from src.__init__ import log 
 
 class RawGraphEntity(BaseModel):
     """This tells us about one name or thing we found in a small piece of text, before we check if we already found it before."""
@@ -26,15 +23,11 @@ class RawGraphRelationship(BaseModel):
     @field_validator("relationship_type")
     @classmethod
     def validate_relationship_type(cls, value: str) -> str:
-        from src.documentIngestion.graphRelationshipSchema import ALLOWED_RELATIONSHIP_TYPES
+        from documentIngestion.graphRelationshipSchema import ALLOWED_RELATIONSHIP_TYPES
 
         if value not in ALLOWED_RELATIONSHIP_TYPES:
-            log.warning(
-                "Unsupported relationship type from AI - falling back to RELATED_TO",
-                original_value=value,
-                allowed_types=list(ALLOWED_RELATIONSHIP_TYPES),
-            )
-            return "RELATED_TO"
+            log.warning(f"Unsupported relationship type: {value} \n {value } -- changed to -> RELATED_TO" )
+            value = "RELATED_TO"
         return value
 
 

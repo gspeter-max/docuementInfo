@@ -31,7 +31,7 @@ def build_graph_extraction_messages(chunk: dict[str, Any]) -> list[dict[str, str
             "content": user_prompt_template.format(
                 chunk_id=chunk["chunk_id"],
                 chunk_text=chunk["text"]
-            ),
+            )
         },
     ]
 
