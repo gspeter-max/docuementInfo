@@ -50,6 +50,7 @@ def chunk_document(
     for index, chunk_text in enumerate(splitter.split_text(text)):
         chunks.append(
             {
+                "chunk_id": f"{document_id}::{index}",
                 "chunk_index": index,
                 "text": chunk_text,
                 "token_count": count_tokens(chunk_text),

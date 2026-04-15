@@ -3,9 +3,9 @@ from typing import Any
 from pathlib import Path
 from openai import AsyncOpenAI
 
-from src.documentIngestion.graphRelationshipSchema import get_relationship_schema_prompt_text
-from src.documentIngestion.models.graphExtractionModels import ChunkGraphExtractionResult
-from src.providers.llmProvider import DEFAULT_MODEL
+from documentIngestion.graphRelationshipSchema import get_relationship_schema_prompt_text
+from documentIngestion.models.graphExtractionModels import ChunkGraphExtractionResult
+from providers.llmProvider import DEFAULT_MODEL
 
 
 def parse_chunk_graph_extraction_response(response_payload: dict[str, Any]) -> ChunkGraphExtractionResult:
@@ -42,7 +42,8 @@ async def extract_graph_data_from_chunk(
     chunk: dict[str, Any],
     model: str = DEFAULT_MODEL,
 ) -> ChunkGraphExtractionResult:
-    """This function looks at a small piece of the text and asks the AI to find all the important names (like people or places) and how they connect to each other, like drawing lines between dots."""
+    """This function looks at a small piece of the text and asks the AI to find all the important names 
+    (like people or places) and how they connect to each other, like drawing lines between dots."""
     response = await llm_client.chat.completions.create(
         model=model,
         messages=build_graph_extraction_messages(chunk),
@@ -51,3 +52,5 @@ async def extract_graph_data_from_chunk(
     )
     response_payload = json.loads(response.choices[0].message.content or "{}")
     return parse_chunk_graph_extraction_response(response_payload)
+
+

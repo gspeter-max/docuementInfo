@@ -1,6 +1,6 @@
 from typing import Any
 
-from src.documentIngestion.models.graphExtractionModels import ChunkGraphExtractionResult, CanonicalGraphPersistencePayload
+from documentIngestion.models.graphExtractionModels import ChunkGraphExtractionResult, CanonicalGraphPersistencePayload
 
 
 def rewrite_graph_results_to_canonical_entities(

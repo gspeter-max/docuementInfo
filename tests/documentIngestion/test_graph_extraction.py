@@ -1,4 +1,5 @@
 import pytest
+import pydantic
 
 from src.documentIngestion.graphRelationshipSchema import (
     ALLOWED_RELATIONSHIP_TYPES,
@@ -66,14 +67,29 @@ def test_parse_chunk_graph_extraction_response_returns_entities_and_relationship
     assert result.entities[0].entity_name == "Alice"
     assert result.relationships[0].relationship_type == "RELATED_TO"
 
-import pydantic
-
 def test_parse_chunk_graph_extraction_handles_missing_keys():
     """This test makes sure that if the AI gives us a bad dictionary missing keys, we throw a validation error."""
     response_payload = {
         "entities": [{"entity_name": "Alice"}],
         "relationships": []
     }
+    with pytest.raises(pydantic.ValidationError):
+        parse_chunk_graph_extraction_response(response_payload)
+
+def test_parse_chunk_graph_extraction_response_rejects_unknown_relationship_type():
+    response_payload = {
+        "entities": [],
+        "relationships": [
+            {
+                "source_entity_name": "Alice",
+                "relationship_type": "SENDS_TO",
+                "target_entity_name": "Neo4j",
+                "evidence_text": "Alice sends data to Neo4j.",
+                "chunk_id": "resume.pdf::0",
+            }
+        ],
+    }
+
     with pytest.raises(pydantic.ValidationError):
         parse_chunk_graph_extraction_response(response_payload)
 
