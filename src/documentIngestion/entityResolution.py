@@ -1,10 +1,13 @@
 import json
-from pathlib import Path
 from typing import Any
 from openai import AsyncOpenAI
 from rapidfuzz import fuzz
 
 from src.documentIngestion.models.graphExtractionModels import EntityResolutionDecision
+from src.documentIngestion.prompts.graph.prompts_for_checking_if_two_names_are_the_same import (
+    SYSTEM_PROMPT,
+    USER_PROMPT_TEMPLATE,
+)
 from src.providers.llmProvider import DEFAULT_MODEL
 
 
@@ -60,22 +63,18 @@ def build_entity_resolution_review_payload(ambiguous_pairs: list[tuple[str, str,
             for pair in ambiguous_pairs
         ]
     }
-
+ 
 
 def build_entity_resolution_messages(payload: dict[str, Any]) -> list[dict[str, str]]:
     """This function gets the right files with instructions to ask the AI if two names are the same."""
-    prompts_dir = Path(__file__).parent / "prompts" / "graph"
-    system_prompt = (prompts_dir / "resolution_system.md").read_text(encoding="utf-8")
-    user_prompt_template = (prompts_dir / "resolution_user.md").read_text(encoding="utf-8")
-
     return [
         {
             "role": "system",
-            "content": system_prompt,
+            "content": SYSTEM_PROMPT,
         },
         {
             "role": "user",
-            "content": user_prompt_template.format(
+            "content": USER_PROMPT_TEMPLATE.format(
                 payload_json=json.dumps(payload, indent=2)
             ),
         },
