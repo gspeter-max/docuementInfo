@@ -1,11 +1,14 @@
 import json
 from typing import Any
-from pathlib import Path
 from openai import AsyncOpenAI
 
-from documentIngestion.graphRelationshipSchema import get_relationship_schema_prompt_text
-from documentIngestion.models.graphExtractionModels import ChunkGraphExtractionResult
-from providers.llmProvider import DEFAULT_MODEL
+from src.documentIngestion.graphRelationshipSchema import get_relationship_schema_prompt_text
+from src.documentIngestion.models.graphExtractionModels import ChunkGraphExtractionResult
+from src.documentIngestion.prompts.graph.prompts_for_extracting_graph_data import (
+    SYSTEM_PROMPT,
+    USER_PROMPT_TEMPLATE,
+)
+from src.providers.llmProvider import DEFAULT_MODEL
 
 
 def parse_chunk_graph_extraction_response(response_payload: dict[str, Any]) -> ChunkGraphExtractionResult:
@@ -15,20 +18,16 @@ def parse_chunk_graph_extraction_response(response_payload: dict[str, Any]) -> C
 
 def build_graph_extraction_messages(chunk: dict[str, Any]) -> list[dict[str, str]]:
     """This function puts together the instructions and the text piece so we can ask the AI to find names and connections."""
-    prompts_dir = Path(__file__).parent / "prompts" / "graph"
-    system_prompt_template = (prompts_dir / "extraction_system.md").read_text(encoding="utf-8")
-    user_prompt_template = (prompts_dir / "extraction_user.md").read_text(encoding="utf-8")
-
     return [
         {
             "role": "system",
-            "content": system_prompt_template.format(
+            "content": SYSTEM_PROMPT.format(
                 schema_text=get_relationship_schema_prompt_text()
             ),
         },
         {
             "role": "user",
-            "content": user_prompt_template.format(
+            "content": USER_PROMPT_TEMPLATE.format(
                 chunk_id=chunk["chunk_id"],
                 chunk_text=chunk["text"]
             )
