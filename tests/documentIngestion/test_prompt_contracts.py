@@ -1,8 +1,14 @@
-from pathlib import Path
+from src.documentIngestion.prompts.graph.prompts_for_extracting_graph_data import (
+    SYSTEM_PROMPT as EXTRACTION_SYSTEM,
+    USER_PROMPT_TEMPLATE as EXTRACTION_USER
+)
+from src.documentIngestion.prompts.graph.prompts_for_checking_if_two_names_are_the_same import (
+    SYSTEM_PROMPT as RESOLUTION_SYSTEM
+)
 
 
 def test_extraction_prompt_mentions_related_to_as_fallback_and_evidence_text():
-    prompt = Path("src/documentIngestion/prompts/graph/extraction_system.md").read_text(encoding="utf-8")
+    prompt = EXTRACTION_SYSTEM
 
     assert 'RELATED_TO' in prompt
     assert 'Never invent a new relationship type' in prompt
@@ -10,14 +16,14 @@ def test_extraction_prompt_mentions_related_to_as_fallback_and_evidence_text():
 
 
 def test_resolution_prompt_requires_exact_json_shape():
-    prompt = Path("src/documentIngestion/prompts/graph/resolution_system.md").read_text(encoding="utf-8")
+    prompt = RESOLUTION_SYSTEM
 
     assert "decisions" in prompt
     assert "canonical_name" in prompt
 
 
 def test_extraction_system_prompt_defines_explicit_json_keys():
-    prompt = Path("src/documentIngestion/prompts/graph/extraction_system.md").read_text(encoding="utf-8")
+    prompt = EXTRACTION_SYSTEM
     
     # Check for entity keys
     assert "entity_name" in prompt
@@ -31,7 +37,7 @@ def test_extraction_system_prompt_defines_explicit_json_keys():
 
 
 def test_extraction_user_prompt_contains_one_shot_example():
-    prompt = Path("src/documentIngestion/prompts/graph/extraction_user.md").read_text(encoding="utf-8")
+    prompt = EXTRACTION_USER
     
     assert "Example Output Format" in prompt or "Example" in prompt
     assert "Alice" in prompt # Basic check that example content exists

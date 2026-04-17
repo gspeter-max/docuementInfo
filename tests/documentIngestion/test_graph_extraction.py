@@ -16,16 +16,16 @@ def test_relationship_schema_prompt_lists_every_allowed_relationship():
         assert relationship_type in prompt_text
 
 
-def test_raw_graph_relationship_rejects_unknown_relationship_type():
-    """This test makes sure that if the AI tries to use a connection type we did not allow, we throw an error and stop it."""
-    with pytest.raises(ValueError):
-        RawGraphRelationship(
-            source_entity_name="Alice",
-            relationship_type="WORKS",
-            target_entity_name="Neo4j",
-            evidence_text="Alice works at Neo4j.",
-            chunk_id="resume.pdf::0",
-        )
+def test_raw_graph_relationship_falls_back_to_related_to_for_unknown_type():
+    """This test makes sure that if the AI tries to use a connection type we did not allow, we fall back to RELATED_TO instead of erroring."""
+    rel = RawGraphRelationship(
+        source_entity_name="Alice",
+        relationship_type="WORKS",
+        target_entity_name="Neo4j",
+        evidence_text="Alice works at Neo4j.",
+        chunk_id="resume.pdf::0",
+    )
+    assert rel.relationship_type == "RELATED_TO"
 
 def test_raw_graph_entity_rejects_empty_evidence_text():
     """This edge-case test makes sure our system properly catches errors if the AI gives us an empty string for evidence."""
@@ -76,7 +76,7 @@ def test_parse_chunk_graph_extraction_handles_missing_keys():
     with pytest.raises(pydantic.ValidationError):
         parse_chunk_graph_extraction_response(response_payload)
 
-def test_parse_chunk_graph_extraction_response_rejects_unknown_relationship_type():
+def test_parse_chunk_graph_extraction_response_falls_back_to_related_to_for_unknown_type():
     response_payload = {
         "entities": [],
         "relationships": [
@@ -90,8 +90,8 @@ def test_parse_chunk_graph_extraction_response_rejects_unknown_relationship_type
         ],
     }
 
-    with pytest.raises(pydantic.ValidationError):
-        parse_chunk_graph_extraction_response(response_payload)
+    result = parse_chunk_graph_extraction_response(response_payload)
+    assert result.relationships[0].relationship_type == "RELATED_TO"
 
 def test_parse_chunk_graph_extraction_handles_empty_lists():
     """This test makes sure we handle empty lists gracefully when nothing is found."""
