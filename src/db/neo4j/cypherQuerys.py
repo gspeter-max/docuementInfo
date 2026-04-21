@@ -31,23 +31,28 @@ async def save_chunk(
     client: Neo4jClient,
     chunk: dict[str, Any],
     embedding: list[float],
+    entity_ids: list[str] = None, # This is our new list of codes
 ) -> None:
     """
     Upserts a single Chunk node with its contextualized text and embedding vector.
     MERGE on chunk_id avoids duplicate nodes when the same document is re-ingested.
 
     Expected keys in `chunk`:
-        chunk_index  – unique identifier for this chunk
-        text         – raw chunk text
-        context      – LLM-generated contextual prefix
-        document_id  – parent document identifier
+        chunk_index  - unique identifier for this chunk
+        text         - raw chunk text
+        context      - LLM-generated contextual prefix
+        document_id  - parent document identifier
+    
+    Now, it also saves a list of codes (entity_ids) for the important 
+    names found in this piece of text.
     """
     query = """
     MERGE (c:Chunk {chunk_id: $chunk_id})
     SET c.text        = $text,
         c.context     = $context,
         c.document_id = $document_id,
-        c.embedding   = $embedding
+        c.embedding   = $embedding,
+        c.entity_ids  = $entity_ids  // We added this line to save the codes!
     """
     await client.execute_query(query, {
         "chunk_id":    chunk["chunk_id"],
@@ -55,6 +60,7 @@ async def save_chunk(
         "context":     chunk["context"],
         "document_id": chunk["document_id"],
         "embedding":   embedding,
+        "entity_ids":  entity_ids or [], # If there are no codes, save an empty list
     })
 
 
