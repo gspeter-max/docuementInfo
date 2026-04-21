@@ -60,68 +60,60 @@ async def extract_chunk_graph_data_in_parallel(chunks: list[dict[str, Any]]) -> 
 
 async def resolve_entities_for_graph(raw_chunk_graph_results: list[Any]) -> dict[str, Any]:
     """Code-first funnel + focused LLM cleanup for entity names."""
-    all_raw_names = []
+    unique_names = set()
     for res in raw_chunk_graph_results:
-        all_raw_names.extend([e.entity_name for e in res.entities])
-        all_raw_names.extend([r.source_entity_name for r in res.relationships])
-        all_raw_names.extend([r.target_entity_name for r in res.relationships])
-        
-    unique_raw_names = list(set(all_raw_names))
-    if not unique_raw_names:
+        for e in res.entities:
+            unique_names.add(e.entity_name)
+        for r in res.relationships:
+            unique_names.add(r.source_entity_name)
+            unique_names.add(r.target_entity_name)
+            
+    if not unique_names:
         return {"canonical_name_by_raw_name": {}}
 
-    grouped_names = group_entities_by_normalized_name(unique_raw_names)
-    canonical_name_by_raw_name = {}
-    for normalized_name, original_names in grouped_names.items():
-        canonical_name = sorted(original_names, key=len)[0]
+    grouped_names = group_entities_by_normalized_name(list(unique_names))
+    canonical_map = {}
+    for _, original_names in grouped_names.items():
+        canonical_name = min(original_names, key=len)
         for name in original_names:
-            canonical_name_by_raw_name[name] = canonical_name
+            canonical_map[name] = canonical_name
             
     # Then fuzzy merge
-    unique_canonicals = list(set(canonical_name_by_raw_name.values()))
+    unique_canonicals = list(set(canonical_map.values()))
     fuzzy_candidates = find_fuzzy_merge_candidates(unique_canonicals)
-    
     # Fake scores for now
-    pairs_with_scores = [(l, r, 0.75) for l, r in fuzzy_candidates]
-    same_entity_pairs, ambiguous_pairs, different_entity_pairs = split_clear_cases_from_ambiguous_cases(pairs_with_scores)
+    same_pairs, ambiguous_pairs, _ = split_clear_cases_from_ambiguous_cases([(l, r, 0.75) for l, r in fuzzy_candidates])
     
-    for l, r, _ in same_entity_pairs:
-        canonical_name_by_raw_name[r] = canonical_name_by_raw_name.get(l, l)
+    for l, r, _ in same_pairs:
+        canonical_map[r] = canonical_map.get(l, l)
 
     client = await build_mistral_client()
     decisions = await resolve_ambiguous_entity_pairs(llm_client=client, ambiguous_pairs=ambiguous_pairs)
     
     for decision in decisions:
         if decision.should_merge:
-            canonical_name_by_raw_name[decision.left_name] = decision.canonical_name
-            canonical_name_by_raw_name[decision.right_name] = decision.canonical_name
+            canonical_map[decision.left_name] = decision.canonical_name
+            canonical_map[decision.right_name] = decision.canonical_name
 
-    return {"canonical_name_by_raw_name": canonical_name_by_raw_name}
+    return {"canonical_name_by_raw_name": canonical_map}
 
 
 async def persist_document_graph(
-    contextualized_document: dict[str, Any],
-    contextualized_chunk_embeddings: list[list[float]],
-    canonical_graph_payload: Any,
+    doc: dict[str, Any],
+    embeddings: list[list[float]],
     graph_write_payload: dict[str, Any] # We pass the whole payload now
 ) -> None:
-    """
-    This is the function that actually talks to the database and 
-    saves everything. We updated it to send the name codes to each 
-    piece of text.
-    """
     neo4j_client = Neo4jClient(neo4j_uri, neo4j_user, neo4j_password)
     try:
         await create_vector_index(neo4j_client, _INDEX_NAME, _EMBEDDING_DIM)
         
         await save_document_node(
             neo4j_client, 
-            contextualized_document["document_id"], 
-            contextualized_document.get("source_file", "")
+            doc["document_id"], 
+            doc.get("source_file", "")
         )
 
-        chunks = contextualized_document["chunks"]
-        # Get our map of text-to-codes
+        chunks = doc["chunks"]
         chunk_to_ids_map = graph_write_payload.get("chunk_to_entity_ids", {})
 
         # Save all chunks at once, each with its own list of name codes
@@ -132,7 +124,7 @@ async def persist_document_graph(
                 embedding, 
                 entity_ids=chunk_to_ids_map.get(chunk["chunk_id"], [])
             )
-            for chunk, embedding in zip(chunks, contextualized_chunk_embeddings)
+            for chunk, embedding in zip(chunks, embeddings)
         ])
         
         # Save the graph nodes and connections
@@ -153,32 +145,31 @@ def build_ingestion_summary_response(contextualized_document: dict[str, Any], ca
 
 
 async def ingest_document_graph(file_path: str) -> dict[str, int | str]:
-    """This is the big boss function. It takes one document, breaks it into pieces, finds names and connections in each piece, cleans up the names so there are no duplicates, and saves everything into the database."""
-    contextualized_document = await build_contextualized_document(file_path=file_path, client=await build_mistral_client())
-    contextualized_chunk_embeddings = await build_contextualized_chunk_embeddings(contextualized_document["chunks"])
-    raw_chunk_graph_results = await extract_chunk_graph_data_in_parallel(contextualized_document["chunks"])
-    canonical_resolution_result = await resolve_entities_for_graph(raw_chunk_graph_results)
+    """Core document ingestion graph processing pipeline."""
+    doc = await build_contextualized_document(file_path=file_path, client=await build_mistral_client())
+    embeddings = await build_contextualized_chunk_embeddings(doc["chunks"])
+    raw_results = await extract_chunk_graph_data_in_parallel(doc["chunks"])
+    resolution_result = await resolve_entities_for_graph(raw_results)
     
-    canonical_graph_payload = rewrite_graph_results_to_canonical_entities(
-        raw_chunk_graph_results,
-        canonical_resolution_result["canonical_name_by_raw_name"],
+    canonical_payload = rewrite_graph_results_to_canonical_entities(
+        raw_results,
+        resolution_result["canonical_name_by_raw_name"],
     )
     
     # Send the finished payload to be saved
     graph_write_payload = build_neo4j_graph_write_payload(
-        contextualized_document["document_id"],
-        canonical_graph_payload.entities,
-        canonical_graph_payload.relationships,
+        doc["document_id"],
+        canonical_payload.entities,
+        canonical_payload.relationships,
     )
     
     await persist_document_graph(
-        contextualized_document, 
-        contextualized_chunk_embeddings, 
-        canonical_graph_payload,
+        doc, 
+        embeddings, 
         graph_write_payload
     )
     
-    return build_ingestion_summary_response(contextualized_document, canonical_graph_payload)
+    return build_ingestion_summary_response(doc, canonical_payload)
 
 
 @ingestionRouter.post("/ingest", response_model=ingestionResponse)
