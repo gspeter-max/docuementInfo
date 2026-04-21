@@ -70,25 +70,47 @@ def build_neo4j_graph_write_payload(
     canonical_entities: list[dict[str, Any]],
     rewritten_relationships: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """This function packages up all the deduplicated entities, their mentions, and deduplicated relationships for saving."""
+    """
+    This function gathers all the names and connections we found in a 
+    document and prepares them to be saved.
+    
+    We updated it to also map each piece of text (Chunk) to the unique 
+    entity_id of the names found inside it.
+    """
     unique_entities = {}
     mentions = []
-    
+    # This dictionary will map: piece_of_text -> [list of name entity_ids]
+    chunk_to_entity_ids = {}
+
     for entity in canonical_entities:
-        canonical_name = entity["canonical_name"]
-        if canonical_name not in unique_entities:
-            unique_entities[canonical_name] = {
-                "canonical_name": canonical_name,
-                "entity_type": entity["entity_type"]
+        clean_name = entity["canonical_name"]
+        # Use our tool from Task 1 to get the code
+        entity_id = generate_stable_entity_id(clean_name)
+
+        if clean_name not in unique_entities:
+            unique_entities[clean_name] = {
+                "canonical_name": clean_name,
+                "entity_type": entity["entity_type"],
+                "entity_id": entity_id # Remember the code for the entity
             }
-        
+
         mentions.append({
-            "canonical_name": canonical_name,
+            "canonical_name": clean_name,
+            "entity_id": entity_id,
             "document_id": document_id,
             "chunk_id": entity["chunk_id"],
             "evidence_text": entity["evidence_text"],
         })
         
+        # Link this code to the specific piece of text it came from
+        parent_chunk_id = entity["chunk_id"]
+        if parent_chunk_id not in chunk_to_entity_ids:
+            chunk_to_entity_ids[parent_chunk_id] = set()
+        chunk_to_entity_ids[parent_chunk_id].add(entity_id)
+
+    # Convert sets to lists so the database can read them easily
+    chunk_to_entity_ids = {k: list(v) for k, v in chunk_to_entity_ids.items()}
+
     for rel in rewritten_relationships:
         rel["document_id"] = document_id
         
@@ -99,4 +121,5 @@ def build_neo4j_graph_write_payload(
         "entities": list(unique_entities.values()),
         "mentions": mentions,
         "relationships": merged_relationships,
+        "chunk_to_entity_ids": chunk_to_entity_ids # Pass our new mapping along
     }
