@@ -1,6 +1,27 @@
 from typing import Any
+import hashlib
 
 from documentIngestion.models.graphExtractionModels import ChunkGraphExtractionResult, CanonicalGraphPersistencePayload
+
+def generate_stable_entity_id(name: str) -> str:
+    """
+    This function takes a name (like 'Apple') and turns it into a short 
+    12-character code (like 'a1b2c3'). 
+    
+    It's like giving every important thing a unique ID card so the 
+    computer doesn't get confused between different things with the 
+    same name.
+    """
+    # 1. Clean up the name (remove extra spaces and make letters small)
+    normalized_name = " ".join(name.lower().strip().split())
+    
+    # 2. Turn the name into a scrambled secret code (a hash)
+    secret_code = hashlib.sha256(normalized_name.encode()).hexdigest()
+    
+    # 3. Take just the first 12 letters of that code to keep it short
+    short_code = secret_code[:12]
+    
+    return short_code
 
 
 def rewrite_graph_results_to_canonical_entities(
