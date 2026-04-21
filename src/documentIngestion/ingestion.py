@@ -102,9 +102,14 @@ async def resolve_entities_for_graph(raw_chunk_graph_results: list[Any]) -> dict
 async def persist_document_graph(
     contextualized_document: dict[str, Any],
     contextualized_chunk_embeddings: list[list[float]],
-    canonical_graph_payload: Any
+    canonical_graph_payload: Any,
+    graph_write_payload: dict[str, Any] # We pass the whole payload now
 ) -> None:
-    """Writes chunks to Neo4j, then writes the canonical graph extraction payload."""
+    """
+    This is the function that actually talks to the database and 
+    saves everything. We updated it to send the name codes to each 
+    piece of text.
+    """
     neo4j_client = Neo4jClient(neo4j_uri, neo4j_user, neo4j_password)
     try:
         await create_vector_index(neo4j_client, _INDEX_NAME, _EMBEDDING_DIM)
@@ -116,16 +121,21 @@ async def persist_document_graph(
         )
 
         chunks = contextualized_document["chunks"]
+        # Get our map of text-to-codes
+        chunk_to_ids_map = graph_write_payload.get("chunk_to_entity_ids", {})
+
+        # Save all chunks at once, each with its own list of name codes
         await asyncio.gather(*[
-            save_chunk(neo4j_client, chunk, embedding)
+            save_chunk(
+                neo4j_client, 
+                chunk, 
+                embedding, 
+                entity_ids=chunk_to_ids_map.get(chunk["chunk_id"], [])
+            )
             for chunk, embedding in zip(chunks, contextualized_chunk_embeddings)
         ])
         
-        graph_write_payload = build_neo4j_graph_write_payload(
-            contextualized_document["document_id"],
-            canonical_graph_payload.entities,
-            canonical_graph_payload.relationships,
-        )
+        # Save the graph nodes and connections
         await save_entity_nodes_and_relationships(neo4j_client, graph_write_payload)
 
     finally:
@@ -154,10 +164,18 @@ async def ingest_document_graph(file_path: str) -> dict[str, int | str]:
         canonical_resolution_result["canonical_name_by_raw_name"],
     )
     
+    # Send the finished payload to be saved
+    graph_write_payload = build_neo4j_graph_write_payload(
+        contextualized_document["document_id"],
+        canonical_graph_payload.entities,
+        canonical_graph_payload.relationships,
+    )
+    
     await persist_document_graph(
         contextualized_document, 
         contextualized_chunk_embeddings, 
-        canonical_graph_payload
+        canonical_graph_payload,
+        graph_write_payload
     )
     
     return build_ingestion_summary_response(contextualized_document, canonical_graph_payload)
