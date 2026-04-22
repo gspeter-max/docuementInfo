@@ -143,3 +143,47 @@ async def retrieve_similar_chunks(
         "top_k":      top_k,
         "embedding":  query_embedding,
     })
+
+
+async def fetch_entity_neighbors_1hop(client: Neo4jClient, entity_ids: list[str]) -> list[dict[str, Any]]:
+    """
+    Given a list of entity_ids (extracted from chunks), find all immediate 
+    (1-hop) relationships for those entities.
+    Returns: source canonical_name, relationship_type, target canonical_name, evidence_text.
+    """
+    if not entity_ids:
+        return []
+
+    query = """
+    MATCH (source:Entity)-[r:RELATES_TO]->(target:Entity)
+    WHERE source.canonical_name IN $entity_ids OR target.canonical_name IN $entity_ids
+    RETURN 
+        source.canonical_name AS source,
+        r.relationship_type AS rel_type,
+        target.canonical_name AS target,
+        r.evidence_text AS evidence_text
+    """
+    return await client.execute_query(query, {"entity_ids": entity_ids})
+
+
+async def fetch_entity_neighbors_2hop(client: Neo4jClient, entity_ids: list[str]) -> list[dict[str, Any]]:
+    """
+    Given a list of entity_ids, find relationships up to 2 hops away (*1..2).
+    Use this if 1-hop returns nothing.
+    """
+    if not entity_ids:
+        return []
+
+    query = """
+    MATCH (source:Entity)-[r:RELATES_TO*1..2]-(target:Entity)
+    WHERE source.canonical_name IN $entity_ids
+    // Unwind relationships to return flat rows
+    UNWIND r AS single_rel
+    MATCH (s)-[single_rel]->(t)
+    RETURN DISTINCT
+        s.canonical_name AS source,
+        single_rel.relationship_type AS rel_type,
+        t.canonical_name AS target,
+        single_rel.evidence_text AS evidence_text
+    """
+    return await client.execute_query(query, {"entity_ids": entity_ids})
