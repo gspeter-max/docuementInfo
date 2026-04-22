@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   neo4j:
     image: neo4j:5.26-community
@@ -12,8 +10,9 @@ services:
 
     environment:
       # Auth format: <username>/<password>
-      # Read from your project root .env file
-      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:?NEO4J_PASSWORD must be set in .env}
+      # Reads NEO4J_USER and NEO4J_PASSWORD from project root .env
+      # Run with: docker compose --project-directory . -f dockerHostedServices/docker-compose.yml up -d
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD}
 
       # Allow connections from any host (required for local dev)
       NEO4J_dbms_default__listen__address: "0.0.0.0"

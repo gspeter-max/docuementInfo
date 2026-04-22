@@ -23,12 +23,13 @@ No cloud account needed. All data persists in `neo4j/data/`.
 
    See `.env.example` for a full template.
 
-2. **Start Neo4j**:
+2. **Start Neo4j** (from the project root `documentInFo/`):
 
    ```bash
-   cd dockerHostedServices
-   docker compose up -d
+   docker compose --project-directory . -f dockerHostedServices/docker-compose.yml up -d
    ```
+
+   > `--project-directory .` tells Docker Compose to look for `.env` in the **current folder** (project root), not inside `dockerHostedServices/`. This is how it reads `NEO4J_PASSWORD`.
 
 3. **Wait ~15 seconds** for Neo4j to initialise, then open the browser UI:
    ```
@@ -41,18 +42,18 @@ No cloud account needed. All data persists in `neo4j/data/`.
 ## Daily usage
 
 ```bash
-# Start
-docker compose up -d
+# Start (always run from project root)
+docker compose --project-directory . -f dockerHostedServices/docker-compose.yml up -d
 
 # Stop (data is preserved)
-docker compose down
+docker compose --project-directory . -f dockerHostedServices/docker-compose.yml down
 
 # View logs
-docker compose logs -f neo4j
+docker compose --project-directory . -f dockerHostedServices/docker-compose.yml logs -f neo4j
 
 # Full reset — deletes ALL graph data
-docker compose down -v
-rm -rf neo4j/data neo4j/logs
+docker compose --project-directory . -f dockerHostedServices/docker-compose.yml down -v
+rm -rf dockerHostedServices/neo4j/data dockerHostedServices/neo4j/logs
 ```
 
 ---
