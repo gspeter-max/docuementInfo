@@ -1,9 +1,6 @@
 import asyncio
 from typing import Any
-from fastapi import APIRouter
 import structlog
-
-from src.documentIngestion.models.ingestionModels import ingestionRequest, ingestionResponse
 from src.documentIngestion.contextual_retrieval import build_contextualized_document
 from src.providers.llmProvider import build_mistral_client
 from src.providers.embeddingModelProvider import embeddingModel
@@ -28,8 +25,6 @@ from src.documentIngestion.graphPersistence import (
 from src.config import jina_api_key, neo4j_uri, neo4j_user, neo4j_password
 
 log = structlog.get_logger(__name__)
-
-ingestionRouter = APIRouter()
 
 _INDEX_NAME = "chunk_vector_index"
 _EMBEDDING_DIM = 768  # jina-embeddings-v2-base-en output dimension
@@ -275,27 +270,3 @@ async def ingest_document_graph(file_path: str) -> dict[str, int | str]:
     )
     
     return build_ingestion_summary_response(doc, canonical_payload)
-
-
-@ingestionRouter.post("/ingest", response_model=ingestionResponse)
-async def ingest_document(request: ingestionRequest):
-    """
-    POST /ingest — FastAPI route handler for document ingestion.
-
-    Accepts a file path, delegates the full pipeline to ingest_document_graph,
-    and returns a structured ingestionResponse. Any uncaught exception is logged
-    and returned as a status="error" response (does not raise HTTP 500).
-
-    Args:
-        request: ingestionRequest model with a "file_path" field.
-
-    Returns:
-        ingestionResponse with status, message, and graph counts on success,
-        or status="error" with the exception message on failure.
-    """
-    try:
-        summary = await ingest_document_graph(request.file_path)
-        return ingestionResponse(**summary)
-    except Exception as e:
-        log.error("Ingestion failed", error=str(e), exc_info=True)
-        return ingestionResponse(status="error", message=str(e))

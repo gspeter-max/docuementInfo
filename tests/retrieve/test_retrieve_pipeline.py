@@ -8,10 +8,12 @@ from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
 from documentRetrieve.models import QueryRequest
-from documentRetrieve.retrieve import retrieveRouter, handle_query
+from documentRetrieve.retrieve import handle_query
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# Import the router from its new home in app/
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'app'))
+from app.retrieveAPI import retrieveRouter
 
 # Setup a dummy app to test the router
 app = FastAPI()
@@ -145,10 +147,9 @@ async def test_simple_query_insufficient_path(
 
 
 def test_api_route():
-    """Verify the /query endpoint works and delegates properly."""
-    # We mock handle_query to avoid DB and LLM calls
-    with patch("documentRetrieve.retrieve.handle_query") as mock_handle:
-        # Mock what handle_query returns
+    """Verify the /retrieve/query endpoint works and delegates properly."""
+    # Patch where the function is *called from*, which is app.retrieveAPI
+    with patch("app.retrieveAPI.handle_query") as mock_handle:
         from documentRetrieve.models import QueryResponse
         mock_handle.return_value = QueryResponse(
             answer="test answer",
@@ -158,7 +159,7 @@ def test_api_route():
             context_used=["chunk"]
         )
         
-        response = client.post("/query", json={"query": "test", "top_k": 5, "top_k_rerank": 3})
+        response = client.post("/retrieve/query", json={"query": "test", "top_k": 5, "top_k_rerank": 3})
         
     assert response.status_code == 200
     assert response.json() == {

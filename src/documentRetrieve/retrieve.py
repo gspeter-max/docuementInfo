@@ -1,9 +1,11 @@
 """
-Main retrieval pipeline and FastAPI router for the /query endpoint.
+Retrieval pipeline business logic.
+
+This module contains pure pipeline functions only.
+Endpoints live in app/retrieveAPI.py.
 """
 from typing import Any
 import structlog
-from fastapi import APIRouter
 
 from config import neo4j_uri, neo4j_user, neo4j_password, jina_api_key
 from db.neo4j import Neo4jClient
@@ -19,7 +21,6 @@ from documentRetrieve.graphAgent import gather_graph_facts
 from documentRetrieve.prompts.answer_generator import build_final_answer_prompt
 
 log = structlog.get_logger()
-retrieveRouter = APIRouter()
 
 # Name of the Neo4j vector index for chunks (should match ingestion)
 CHUNK_VECTOR_INDEX = "chunk_embedding_index"
@@ -144,11 +145,3 @@ async def handle_query(request: QueryRequest) -> QueryResponse:
 
     finally:
         await client.close()
-
-
-@retrieveRouter.post("/query", response_model=QueryResponse)
-async def query_endpoint(request: QueryRequest):
-    """
-    POST endpoint to run the Hybrid Adaptive RAG pipeline.
-    """
-    return await handle_query(request)
