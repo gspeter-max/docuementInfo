@@ -135,7 +135,8 @@ async def retrieve_similar_chunks(
         node.context + '\n\n' + node.text AS full_context,
         score,
         node.chunk_id    AS chunk_id,
-        node.document_id AS document_id
+        node.document_id AS document_id,
+        node.entity_ids  AS entity_ids
     ORDER BY score DESC
     """
     return await client.execute_query(query, {
