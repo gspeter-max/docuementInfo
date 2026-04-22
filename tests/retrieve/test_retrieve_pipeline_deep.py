@@ -18,7 +18,7 @@ from documentRetrieve.retrieve import (
     extract_entity_ids_from_chunks,
     handle_query,
 )
-from documentRetrieve.models import QueryRequest
+from app.models.retrieveModels import QueryRequest
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

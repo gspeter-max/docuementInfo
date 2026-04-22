@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
-from documentRetrieve.models import QueryRequest
+from app.models.retrieveModels import QueryRequest
 from documentRetrieve.retrieve import handle_query
 
 # Import the router from its new home in app/
@@ -150,7 +150,7 @@ def test_api_route():
     """Verify the /retrieve/query endpoint works and delegates properly."""
     # Patch where the function is *called from*, which is app.retrieveAPI
     with patch("app.retrieveAPI.handle_query") as mock_handle:
-        from documentRetrieve.models import QueryResponse
+        from app.models.retrieveModels import QueryResponse
         mock_handle.return_value = QueryResponse(
             answer="test answer",
             intent="simple",

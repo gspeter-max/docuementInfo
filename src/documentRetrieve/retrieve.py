@@ -14,7 +14,7 @@ from providers.embeddingModelProvider import embeddingModel
 from providers.llmProvider import build_mistral_client, DEFAULT_MODEL
 from providers.voyageRerankProvider import rerank_documents
 
-from documentRetrieve.models import QueryRequest, QueryResponse
+from app.models.retrieveModels import QueryRequest, QueryResponse
 from documentRetrieve.router import classify_intent
 from documentRetrieve.grader import grade_chunks
 from documentRetrieve.graphAgent import gather_graph_facts
