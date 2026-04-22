@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: neo4j-documentinfo
+    restart: unless-stopped
+
+    ports:
+      - "7474:7474"   # Neo4j Browser UI  → http://localhost:7474
+      - "7687:7687"   # Bolt protocol     → bolt://localhost:7687
+
+    environment:
+      # Auth format: <username>/<password>
+      # Read from your project root .env file
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:?NEO4J_PASSWORD must be set in .env}
+
+      # Allow connections from any host (required for local dev)
+      NEO4J_dbms_default__listen__address: "0.0.0.0"
+
+      # Memory settings — tuned for local development
+      NEO4J_server_memory_heap_initial__size: "512m"
+      NEO4J_server_memory_heap_max__size: "1G"
+      NEO4J_server_memory_pagecache__size: "512m"
+
+      # Enable native vector index (required for db.index.vector.queryNodes)
+      NEO4J_dbms_security_procedures_unrestricted: "db.index.*"
+
+    volumes:
+      # Persistent storage — survives container restart
+      - ./neo4j/data:/data
+      - ./neo4j/logs:/logs
+
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

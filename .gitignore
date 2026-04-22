@@ -24,3 +24,7 @@ data/
 
 # Lock files
 uv.lock
+
+# Neo4j Docker volumes — runtime data, never commit
+dockerHostedServices/neo4j/data/
+dockerHostedServices/neo4j/logs/
