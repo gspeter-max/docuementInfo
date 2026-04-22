@@ -16,7 +16,7 @@ services:
 
       # Allow connections from any host (required for local dev)
       NEO4J_dbms_default__listen__address: "0.0.0.0"
-
+    
       # Memory settings — tuned for local development
       NEO4J_server_memory_heap_initial__size: "512m"
       NEO4J_server_memory_heap_max__size: "1G"
