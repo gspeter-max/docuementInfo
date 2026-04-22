@@ -16,6 +16,7 @@ from documentRetrieve.models import QueryRequest, QueryResponse
 from documentRetrieve.router import classify_intent
 from documentRetrieve.grader import grade_chunks
 from documentRetrieve.graphAgent import gather_graph_facts
+from documentRetrieve.prompts.answer_generator import build_final_answer_prompt
 
 log = structlog.get_logger()
 retrieveRouter = APIRouter()
@@ -40,13 +41,7 @@ async def generate_final_answer(query: str, context_texts: list[str]) -> str:
         return "I could not find relevant information to answer your query."
 
     context_block = "\n\n---\n\n".join(context_texts)
-    prompt = f"""
-You are a helpful and precise assistant. Answer the user's query using ONLY the provided context.
-If the context does not contain the answer, say so clearly. Do not hallucinate external facts.
-
-CONTEXT:
-{context_block}
-"""
+    prompt = build_final_answer_prompt(context_block)
 
     try:
         client = await build_mistral_client()

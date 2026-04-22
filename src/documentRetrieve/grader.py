@@ -10,6 +10,7 @@ import structlog
 from pydantic import BaseModel, Field
 
 from providers.llmProvider import build_mistral_client, DEFAULT_MODEL
+from documentRetrieve.prompts.grader_chunk_evaluator import GRADER_PROMPT
 
 log = structlog.get_logger()
 
@@ -20,29 +21,7 @@ class GraderResult(BaseModel):
     answer: str = Field("", description="If sufficient is True, generate the final answer to the user's query here.")
 
 
-GRADER_PROMPT = """
-You are a strict grading system and an expert assistant. You will be provided with a user query and a set of retrieved documents.
 
-Your job is twofold:
-1. Determine if the retrieved documents contain sufficient information to comprehensively answer the user's query.
-2. If they DO contain enough information, generate the final answer using ONLY the provided documents. Do not hallucinate external facts.
-
-Output your evaluation strictly in JSON format.
-
-If the documents are SUFFICIENT:
-{
-    "sufficient": true,
-    "reason": "",
-    "answer": "The final answer to the user's question goes here..."
-}
-
-If the documents are INSUFFICIENT:
-{
-    "sufficient": false,
-    "reason": "The documents mention John Doe but do not state who he reports to.",
-    "answer": ""
-}
-"""
 
 
 async def grade_chunks(query: str, chunks: list[str]) -> GraderResult:
