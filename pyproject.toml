@@ -16,6 +16,7 @@ dependencies = [
     "structlog>=23.3.0",
     "fastapi>=0.100.0",
     "python-dotenv>=1.2.2",
+    "langgraph>=0.2.0",
 ]
 
 [tool.pytest.ini_options]
