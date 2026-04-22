@@ -1,9 +1,14 @@
 """
 Document parsing using the LlamaCloud SDK (llama-cloud >= 2.0).
 
-Uses the single-call parsing.parse() API that accepts upload_file directly,
-so no separate file upload step is needed. Returns structured JSON page data
-via the 'items' expand option (headings, paragraphs, tables per page).
+Uses the single-call parsing.parse() API with upload_file= parameter.
+Returns structured per-page data using the Text and Items expand options.
+
+Response structure from the API:
+    result.text         → Text object with .pages: List[TextPage]
+    result.text_full    → full document as a single string
+    TextPage            → .page_number (int), .text (str)
+    result.items        → Items object with .pages: List[ItemsPage]
 """
 from llama_cloud import LlamaCloud
 from config import llama_parse_api_key
@@ -21,17 +26,17 @@ def parse_document(file_path: str) -> list[dict]:
     Each dict in the returned list contains:
         "page"   → 1-based page number (int)
         "text"   → plain text for that page (str)
-        "items"  → structured JSON list of blocks (headings, paragraphs, tables)
+        "items"  → list of structured item objects for that page (headings, tables, etc.)
 
     Args:
         file_path: Absolute or relative path to the document (PDF, DOCX, …).
 
     Returns:
-        A list of page dicts.
+        A list of page dicts, one per page in the document.
     """
     client = _build_client()
 
-    # Single-call: upload + parse + poll in one step using upload_file=
+    # Single call: upload + parse + poll until complete
     with open(file_path, "rb") as f:
         result = client.parsing.parse(
             upload_file=(file_path, f),
@@ -40,25 +45,26 @@ def parse_document(file_path: str) -> list[dict]:
             expand=["text", "items"],
         )
 
-    # Group items by their page number
-    items_by_page: dict[int, list] = {}
-    if result.items:
-        for item in result.items:
-            page_num = getattr(item, "page", 1)
-            items_by_page.setdefault(page_num, []).append(item)
+    # result.text is a Text object with .pages: List[TextPage]
+    # Each TextPage has .page_number (int) and .text (str)
+    pages: list[dict] = []
 
-    # Split full text into per-page chunks (LlamaCloud separates pages with \f)
-    text_pages: list[str] = []
-    if result.text:
-        text_pages = result.text.split("\f")
+    if result.text and result.text.pages:
+        # Build a lookup: page_number → list of item objects
+        items_by_page: dict[int, list] = {}
+        if result.items and result.items.pages:
+            for items_page in result.items.pages:
+                page_num = items_page.page_number
+                # ItemsPage holds the structured blocks for that page
+                items_by_page[page_num] = items_page
 
-    pages = []
-    for i, text in enumerate(text_pages, start=1):
-        pages.append({
-            "page": i,
-            "text": text.strip(),
-            "items": items_by_page.get(i, []),
-        })
+        for text_page in result.text.pages:
+            page_num = text_page.page_number
+            pages.append({
+                "page": page_num,
+                "text": (text_page.text or "").strip(),
+                "items": items_by_page.get(page_num, []),
+            })
 
     return pages
 
