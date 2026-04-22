@@ -17,14 +17,18 @@ import structlog
 
 from config import mistral_api_key, neo4j_uri, neo4j_user, neo4j_password
 from db.neo4j import Neo4jClient
-from documentIngestion.contextual_retrieval import build_contextualized_document, build_mistral_client
+from providers.llmProvider import build_mistral_client
+from documentIngestion.contextual_retrieval import build_contextualized_document
 from documentIngestion.ingestion import (
     build_contextualized_chunk_embeddings,
     extract_chunk_graph_data_in_parallel,
     resolve_entities_for_graph,
     persist_document_graph,
 )
-from documentIngestion.graphPersistence import rewrite_graph_results_to_canonical_entities
+from documentIngestion.graphPersistence import (
+    rewrite_graph_results_to_canonical_entities,
+    build_neo4j_graph_write_payload,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -170,8 +174,14 @@ async def run_pipeline_step_by_step(pdf_path: Path, output_dir: Path) -> Path:
         assert isinstance(clean_graph.entities, list), "Error: The clean entities must be a list."
         assert isinstance(clean_graph.relationships, list), "Error: The clean relationships must be a list."
         relationship_count = len(clean_graph.relationships)
-        await persist_document_graph(document_data, embeddings_list, clean_graph)
+        graph_write_payload = build_neo4j_graph_write_payload(
+            document_id,
+            clean_graph.entities,
+            clean_graph.relationships,
+        )
+        await persist_document_graph(document_data, embeddings_list, graph_write_payload)
         log.info("Graph persistence complete")
+
 
         current_stage = "database_verification"
         verification_report = await verify_database_persistence(document_id)
