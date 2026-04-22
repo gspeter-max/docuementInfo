@@ -13,6 +13,6 @@ class QueryRequest(BaseModel):
 class QueryResponse(BaseModel):
     answer: str = Field(..., description="The generated answer to the user's query.")
     intent: str = Field(..., description="The classified intent ('simple' or 'complex').")
-    escalated_to_graph: bool = Field(..., description="True if graph traversal was used.")
-    escalation_reason: str = Field("", description="The reason for graph escalation, if any.")
+    used_graph_search: bool = Field(..., description="True if graph traversal was used to answer the question.")
+    reason_for_graph_search: str = Field("", description="Why we needed to use the graph database, if we did.")
     context_used: list[str] = Field(..., description="The final reranked text chunks used for context.")

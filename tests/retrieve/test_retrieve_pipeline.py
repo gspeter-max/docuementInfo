@@ -61,8 +61,8 @@ async def test_complex_query_path(
 
     # Intent
     assert res.intent == "complex"
-    assert res.escalated_to_graph is True
-    assert res.escalation_reason == ""
+    assert res.used_graph_search is True
+    assert res.reason_for_graph_search == ""
     assert res.answer == "Final Answer"
 
     # Verify context passed to rerank contains both vector and graph chunks
@@ -105,8 +105,8 @@ async def test_simple_query_sufficient_path(
         mock_gather.assert_not_called()
 
     assert res.intent == "simple"
-    assert res.escalated_to_graph is False
-    assert res.escalation_reason == ""
+    assert res.used_graph_search is False
+    assert res.reason_for_graph_search == ""
     assert res.answer == "Final Answer"
 
 
@@ -139,8 +139,8 @@ async def test_simple_query_insufficient_path(
     res = await handle_query(req)
 
     assert res.intent == "simple"
-    assert res.escalated_to_graph is True
-    assert res.escalation_reason == "missing details"
+    assert res.used_graph_search is True
+    assert res.reason_for_graph_search == "missing details"
     assert res.answer == "Final Answer"
 
 
@@ -153,8 +153,8 @@ def test_api_route():
         mock_handle.return_value = QueryResponse(
             answer="test answer",
             intent="simple",
-            escalated_to_graph=False,
-            escalation_reason="",
+            used_graph_search=False,
+            reason_for_graph_search="",
             context_used=["chunk"]
         )
         
@@ -164,7 +164,7 @@ def test_api_route():
     assert response.json() == {
         "answer": "test answer",
         "intent": "simple",
-        "escalated_to_graph": False,
-        "escalation_reason": "",
+        "used_graph_search": False,
+        "reason_for_graph_search": "",
         "context_used": ["chunk"]
     }

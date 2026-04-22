@@ -78,8 +78,8 @@ async def handle_query(request: QueryRequest) -> QueryResponse:
 
     client = Neo4jClient(neo4j_uri, neo4j_user, neo4j_password)
     
-    escalated_to_graph = False
-    escalation_reason = ""
+    used_graph_search = False
+    reason_for_graph_search = ""
     context_to_rerank = []
 
     try:
@@ -98,7 +98,7 @@ async def handle_query(request: QueryRequest) -> QueryResponse:
 
         if intent == "complex":
             # Complex: always go to graph
-            escalated_to_graph = True
+            used_graph_search = True
             entities = extract_entity_ids_from_chunks(raw_chunks)
             graph_facts = await gather_graph_facts(client, entities)
             
@@ -122,9 +122,9 @@ async def handle_query(request: QueryRequest) -> QueryResponse:
                 final_context = vector_texts
             else:
                 # Recovery path: escalate to graph
-                escalated_to_graph = True
-                escalation_reason = grader_result.reason
-                log.info("Escalating simple query to graph", reason=escalation_reason)
+                used_graph_search = True
+                reason_for_graph_search = grader_result.reason
+                log.info("Escalating simple query to graph", reason=reason_for_graph_search)
                 
                 entities = extract_entity_ids_from_chunks(raw_chunks)
                 graph_facts = await gather_graph_facts(client, entities)
@@ -142,8 +142,8 @@ async def handle_query(request: QueryRequest) -> QueryResponse:
         return QueryResponse(
             answer=answer,
             intent=intent,
-            escalated_to_graph=escalated_to_graph,
-            escalation_reason=escalation_reason,
+            used_graph_search=used_graph_search,
+            reason_for_graph_search=reason_for_graph_search,
             context_used=final_context,
         )
 
