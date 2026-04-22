@@ -3,7 +3,7 @@ Task 2: Tests for the Voyage AI reranker provider.
 All HTTP calls are mocked — no real network traffic.
 """
 import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 
 import pytest
 
@@ -24,7 +24,8 @@ def _make_voyage_response(documents: list[str], scores: list[float]):
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
-def test_rerank_returns_top_n_sorted():
+@pytest.mark.anyio
+async def test_rerank_returns_top_n_sorted():
     """
     Given 3 documents with scores [0.3, 0.9, 0.6],
     top_k=2 should return the two highest-scored documents in order.
@@ -36,23 +37,22 @@ def test_rerank_returns_top_n_sorted():
     fake_resp.json.return_value = _make_voyage_response(docs, scores)
     fake_resp.raise_for_status = MagicMock()
 
-    with patch("providers.voyageRerankProvider.requests.post", return_value=fake_resp):
-        result = asyncio.get_event_loop().run_until_complete(
-            rerank_documents(query="test query", documents=docs, top_k=2)
-        )
+    with patch("providers.voyageRerankProvider.httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = fake_resp
+        result = await rerank_documents(query="test query", documents=docs, top_k=2)
 
     assert result == ["doc_high", "doc_mid"]
 
 
-def test_rerank_empty_documents_returns_empty():
+@pytest.mark.anyio
+async def test_rerank_empty_documents_returns_empty():
     """Passing an empty list must return [] without calling the API."""
-    result = asyncio.get_event_loop().run_until_complete(
-        rerank_documents(query="test", documents=[], top_k=5)
-    )
+    result = await rerank_documents(query="test", documents=[], top_k=5)
     assert result == []
 
 
-def test_rerank_respects_top_k():
+@pytest.mark.anyio
+async def test_rerank_respects_top_k():
     """top_k must cap the returned list length."""
     docs = ["a", "b", "c", "d"]
     scores = [0.1, 0.5, 0.8, 0.4]
@@ -61,16 +61,16 @@ def test_rerank_respects_top_k():
     fake_resp.json.return_value = _make_voyage_response(docs, scores)
     fake_resp.raise_for_status = MagicMock()
 
-    with patch("providers.voyageRerankProvider.requests.post", return_value=fake_resp):
-        result = asyncio.get_event_loop().run_until_complete(
-            rerank_documents(query="q", documents=docs, top_k=2)
-        )
+    with patch("providers.voyageRerankProvider.httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = fake_resp
+        result = await rerank_documents(query="q", documents=docs, top_k=2)
 
     assert len(result) == 2
     assert result[0] == "c"   # score 0.8 — highest
 
 
-def test_rerank_uses_rerank_endpoint():
+@pytest.mark.anyio
+async def test_rerank_uses_rerank_endpoint():
     """The provider must call /v1/rerank, not /v1/embeddings."""
     docs = ["x"]
     scores = [0.5]
@@ -79,10 +79,10 @@ def test_rerank_uses_rerank_endpoint():
     fake_resp.json.return_value = _make_voyage_response(docs, scores)
     fake_resp.raise_for_status = MagicMock()
 
-    with patch("providers.voyageRerankProvider.requests.post", return_value=fake_resp) as mock_post:
-        asyncio.get_event_loop().run_until_complete(
-            rerank_documents(query="q", documents=docs, top_k=1)
-        )
+    with patch("providers.voyageRerankProvider.httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = fake_resp
+        await rerank_documents(query="q", documents=docs, top_k=1)
+        
         called_url = mock_post.call_args[0][0]
 
     assert "/v1/rerank" in called_url
