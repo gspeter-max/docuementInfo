@@ -1,16 +1,15 @@
 """
-Deep tests for parseDocument.py — LlamaCloud SDK integration.
+Deep tests for parseDocument.py — LlamaCloud SDK v2 integration.
 
 These tests verify:
-- Upload is called with the correct file handle
+- parse() is called with upload_file= (no separate upload step)
 - parse() is called with correct arguments (tier, version, expand)
 - The page normalisation logic is correct for all edge cases
 - get_all_pages_text() formats output correctly
 - Items are correctly grouped per page
 - Graceful handling of missing text / missing items from API
 """
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch, mock_open, call
+from unittest.mock import MagicMock, patch, mock_open
 import pytest
 
 from documentIngestion.parseDocument import parse_document, get_all_pages_text
@@ -35,47 +34,31 @@ def _make_api_result(text: str, items: list) -> MagicMock:
 
 
 def _make_client(api_result: MagicMock) -> MagicMock:
-    """Build a fake LlamaCloud client."""
+    """Build a fake LlamaCloud client for the new single-call API."""
     client = MagicMock()
-    upload = MagicMock()
-    upload.id = "file-abc123"
-    client.files.upload.return_value = upload
     client.parsing.parse.return_value = api_result
     return client
 
 
 # ── Tests: parse_document() ───────────────────────────────────────────────────
 
-def test_parse_document_uploads_file_before_parsing():
-    """Upload must be called BEFORE parse() — order matters."""
-    call_order = []
-
+def test_parse_document_uses_single_call_with_upload_file():
+    """The new API requires a single parsing.parse(upload_file=...) call — no separate upload step."""
     api_result = _make_api_result("page one content", [])
-    client = MagicMock()
-    upload = MagicMock()
-    upload.id = "file-xyz"
-
-    def record_upload(*args, **kwargs):
-        call_order.append("upload")
-        return upload
-    def record_parse(*args, **kwargs):
-        call_order.append("parse")
-        return api_result
-
-    client.files.upload.side_effect = record_upload
-    client.parsing.parse.side_effect = record_parse
+    client = _make_client(api_result)
 
     with patch("documentIngestion.parseDocument._build_client", return_value=client), \
          patch("builtins.open", mock_open(read_data=b"pdf bytes")):
         parse_document("some/file.pdf")
 
-    assert call_order == ["upload", "parse"], (
-        "File must be uploaded first, then parsed. Got: " + str(call_order)
-    )
+    # files.create (old upload) must NOT be called
+    client.files.create.assert_not_called()
+    # parsing.parse must be called exactly once
+    client.parsing.parse.assert_called_once()
 
 
-def test_parse_document_passes_file_id_from_upload_to_parse():
-    """The file_id returned from upload must be passed into parse()."""
+def test_parse_document_passes_upload_file_kwarg():
+    """parsing.parse() must receive upload_file= keyword with the open file handle."""
     api_result = _make_api_result("content", [])
     client = _make_client(api_result)
 
@@ -84,8 +67,8 @@ def test_parse_document_passes_file_id_from_upload_to_parse():
         parse_document("my_doc.pdf")
 
     parse_call_kwargs = client.parsing.parse.call_args[1]
-    assert parse_call_kwargs["file_id"] == "file-abc123", (
-        "parse() must use the file_id from the upload response"
+    assert "upload_file" in parse_call_kwargs, (
+        "parse() must use upload_file= kwarg — not file_id from a separate upload"
     )
 
 
@@ -266,7 +249,6 @@ def test_get_all_pages_text_separates_pages_with_blank_line():
         {"page": 2, "text": "page two", "items": []},
     ]
     result = get_all_pages_text(pages)
-    # A double newline separates the two page blocks
     assert "\n\n" in result
 
 

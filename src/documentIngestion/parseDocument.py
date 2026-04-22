@@ -1,9 +1,9 @@
 """
-Document parsing using the LlamaCloud SDK (llama-cloud >= 1.0).
+Document parsing using the LlamaCloud SDK (llama-cloud >= 2.0).
 
-Uploads a file to LlamaCloud and returns structured JSON page data via the
-'items' expand option, which gives granular headings/paragraphs/tables
-per page — more informative than plain markdown.
+Uses the single-call parsing.parse() API that accepts upload_file directly,
+so no separate file upload step is needed. Returns structured JSON page data
+via the 'items' expand option (headings, paragraphs, tables per page).
 """
 from llama_cloud import LlamaCloud
 from config import llama_parse_api_key
@@ -31,36 +31,28 @@ def parse_document(file_path: str) -> list[dict]:
     """
     client = _build_client()
 
-    # Step 1: Upload the file
+    # Single-call: upload + parse + poll in one step using upload_file=
     with open(file_path, "rb") as f:
-        upload = client.files.upload(
-            file=(file_path, f),
+        result = client.parsing.parse(
+            upload_file=(file_path, f),
+            tier="cost_effective",
+            version="latest",
+            expand=["text", "items"],
         )
 
-    # Step 2: Parse it — request both text and structured JSON items
-    result = client.parsing.parse(
-        file_id=upload.id,
-        tier="cost_effective",
-        version="latest",
-        expand=["text", "items"],
-    )
-
-    # Step 3: Normalise into list[dict] — one entry per page
-    pages = []
-    items_by_page: dict[int, list] = {}
-
     # Group items by their page number
+    items_by_page: dict[int, list] = {}
     if result.items:
         for item in result.items:
             page_num = getattr(item, "page", 1)
             items_by_page.setdefault(page_num, []).append(item)
 
-    # Build text per page from result.text (split by page marker) as fallback
-    text_pages = []
+    # Split full text into per-page chunks (LlamaCloud separates pages with \f)
+    text_pages: list[str] = []
     if result.text:
-        # LlamaCloud puts a form-feed (\f) between pages
         text_pages = result.text.split("\f")
 
+    pages = []
     for i, text in enumerate(text_pages, start=1):
         pages.append({
             "page": i,
