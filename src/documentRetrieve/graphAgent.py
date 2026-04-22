@@ -9,7 +9,7 @@ from typing import Any
 import structlog
 
 from db.neo4j import Neo4jClient
-from db.neo4j.cypherQuerys import fetch_entity_neighbors_1hop, fetch_entity_neighbors_2hop
+from db.neo4j.cypherQuerys import fetch_entity_neighbors_1hop
 
 log = structlog.get_logger()
 
@@ -37,7 +37,7 @@ def _rows_to_fact_sheet(rows: list[dict[str, Any]]) -> str:
 async def gather_graph_facts(client: Neo4jClient, entity_ids: list[str]) -> str:
     """
     Given seed entity_ids, crawls the graph and returns a formatted text of facts.
-    Tries 1-hop first; if empty, tries 2-hop.
+    Uses 1-hop traversal to gather direct relationships.
     """
     if not entity_ids:
         return ""
@@ -46,11 +46,7 @@ async def gather_graph_facts(client: Neo4jClient, entity_ids: list[str]) -> str:
     rows = await fetch_entity_neighbors_1hop(client, entity_ids)
 
     if not rows:
-        log.debug("1-hop empty, graph agent escalating to 2-hop traversal")
-        rows = await fetch_entity_neighbors_2hop(client, entity_ids)
-
-    if not rows:
-        log.debug("2-hop also empty, returning no facts")
+        log.debug("1-hop empty, returning no facts")
         return ""
 
     log.debug("Graph agent retrieved facts", fact_count=len(rows))
