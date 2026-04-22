@@ -20,9 +20,10 @@ client = TestClient(app)
 
 
 class MockGraderResult:
-    def __init__(self, sufficient, reason):
+    def __init__(self, sufficient, reason, answer=""):
         self.sufficient = sufficient
         self.reason = reason
+        self.answer = answer
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
@@ -76,7 +77,7 @@ async def test_complex_query_path(
 @patch("documentRetrieve.retrieve.build_mistral_client")
 @patch("documentRetrieve.retrieve.classify_intent", return_value="simple")
 @patch("documentRetrieve.retrieve.retrieve_similar_chunks", return_value=[{"full_context": "vec chunk", "chunk_id": "c1"}])
-@patch("documentRetrieve.retrieve.grade_chunks", return_value=MockGraderResult(True, "looks good"))
+@patch("documentRetrieve.retrieve.grade_chunks", return_value=MockGraderResult(True, "looks good", answer="Final Answer"))
 @patch("documentRetrieve.retrieve.rerank_documents", return_value=["reranked vec chunk"])
 async def test_simple_query_sufficient_path(
     mock_rerank, mock_grade, mock_retrieve, mock_classify, mock_build_mistral, mock_neo4j, mock_embed

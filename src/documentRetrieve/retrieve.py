@@ -94,6 +94,8 @@ async def handle_query(request: QueryRequest) -> QueryResponse:
         vector_texts = [c["full_context"] for c in raw_chunks]
         log.info("Vector search complete", num_chunks=len(vector_texts))
 
+        answer = ""
+
         if intent == "complex":
             # Complex: always go to graph
             escalated_to_graph = True
@@ -103,14 +105,21 @@ async def handle_query(request: QueryRequest) -> QueryResponse:
             context_to_rerank = vector_texts.copy()
             if graph_facts:
                 context_to_rerank.append(graph_facts)
+                
+            # Rerank and generate answer
+            log.info("Reranking context", num_items=len(context_to_rerank))
+            final_context = await rerank_documents(query=query, documents=context_to_rerank, top_k=request.top_k_rerank)
+            log.info("Generating final answer")
+            answer = await generate_final_answer(query, final_context)
 
         else:
-            # Simple: evaluate vector chunks with grader
+            # Simple: evaluate vector chunks and attempt to generate answer
             grader_result = await grade_chunks(query, vector_texts)
             
             if grader_result.sufficient:
-                # Fast path
-                context_to_rerank = vector_texts.copy()
+                # Fast path! The grader already generated the answer.
+                answer = grader_result.answer
+                final_context = vector_texts
             else:
                 # Recovery path: escalate to graph
                 escalated_to_graph = True
@@ -123,18 +132,12 @@ async def handle_query(request: QueryRequest) -> QueryResponse:
                 context_to_rerank = vector_texts.copy()
                 if graph_facts:
                     context_to_rerank.append(graph_facts)
-
-        # 3. Rerank all gathered context
-        log.info("Reranking context", num_items=len(context_to_rerank))
-        final_context = await rerank_documents(
-            query=query,
-            documents=context_to_rerank,
-            top_k=request.top_k_rerank,
-        )
-
-        # 4. Generate Answer
-        log.info("Generating final answer")
-        answer = await generate_final_answer(query, final_context)
+                
+                # Rerank and generate answer
+                log.info("Reranking context", num_items=len(context_to_rerank))
+                final_context = await rerank_documents(query=query, documents=context_to_rerank, top_k=request.top_k_rerank)
+                log.info("Generating final answer")
+                answer = await generate_final_answer(query, final_context)
 
         return QueryResponse(
             answer=answer,

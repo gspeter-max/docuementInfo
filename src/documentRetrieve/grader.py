@@ -15,36 +15,43 @@ log = structlog.get_logger()
 
 
 class GraderResult(BaseModel):
-    sufficient: bool = Field(description="True if the chunks contain enough info to answer the query, False otherwise.")
-    reason: str = Field(description="Reason why it is sufficient or insufficient.")
+    sufficient: bool = Field(..., description="True if the chunks contain enough information to fully answer the query.")
+    reason: str = Field(..., description="If sufficient is False, explain exactly what information is missing. If True, this can be empty.")
+    answer: str = Field("", description="If sufficient is True, generate the final answer to the user's query here.")
 
 
 GRADER_PROMPT = """
-You are a grader for a Retrieval-Augmented Generation (RAG) system.
-Your job is to determine if the provided retrieved documents contain sufficient information to fully answer the user's query.
+You are a strict grading system and an expert assistant. You will be provided with a user query and a set of retrieved documents.
 
-CRITERIA:
-- sufficient=True: The query can be fully answered based ONLY on the provided chunks.
-- sufficient=False: The query cannot be fully answered because info is missing, incomplete, or unrelated.
+Your job is twofold:
+1. Determine if the retrieved documents contain sufficient information to comprehensively answer the user's query.
+2. If they DO contain enough information, generate the final answer using ONLY the provided documents. Do not hallucinate external facts.
 
-OUTPUT FORMAT:
-You MUST return your answer as a JSON object with exactly two keys: "sufficient" (boolean) and "reason" (string explaining why).
+Output your evaluation strictly in JSON format.
 
-Example Output:
+If the documents are SUFFICIENT:
+{
+    "sufficient": true,
+    "reason": "",
+    "answer": "The final answer to the user's question goes here..."
+}
+
+If the documents are INSUFFICIENT:
 {
     "sufficient": false,
-    "reason": "The documents mention John Doe but do not state who he reports to."
+    "reason": "The documents mention John Doe but do not state who he reports to.",
+    "answer": ""
 }
 """
 
 
 async def grade_chunks(query: str, chunks: list[str]) -> GraderResult:
     """
-    Grades whether the provided chunks are sufficient to answer the query.
+    Grades whether the provided chunks are sufficient to answer the query, and attempts to generate the answer.
     If JSON parsing fails, defaults to sufficient=False to err on the side of safety (escalation).
     """
     if not chunks:
-        return GraderResult(sufficient=False, reason="No chunks provided.")
+        return GraderResult(sufficient=False, reason="No chunks provided.", answer="")
 
     try:
         client = await build_mistral_client()
@@ -67,19 +74,25 @@ async def grade_chunks(query: str, chunks: list[str]) -> GraderResult:
         content = response.choices[0].message.content
         if not content:
             log.warning("Grader received empty response from LLM, defaulting to insufficient")
-            return GraderResult(sufficient=False, reason="Empty LLM response.")
+            return GraderResult(sufficient=False, reason="Empty LLM response.", answer="")
 
         data = json.loads(content)
         result = GraderResult(
             sufficient=bool(data.get("sufficient", False)),
-            reason=str(data.get("reason", "No reason provided by LLM."))
+            reason=str(data.get("reason", "No reason provided by LLM.")),
+            answer=str(data.get("answer", ""))
         )
 
         if not result.sufficient:
-            log.info("Grader deemed chunks insufficient", reason=result.reason)
+            log.info("Grader determined chunks are insufficient", reason=result.reason)
+        else:
+            log.info("Grader generated answer from chunks")
 
         return result
 
+    except json.JSONDecodeError as e:
+        log.warning("Grader failed to parse JSON from LLM, defaulting to insufficient", error=str(e))
+        return GraderResult(sufficient=False, reason=f"Grader JSON parse error: {e}", answer="")
     except Exception as e:
         log.error("Grader LLM call failed, defaulting to insufficient", error=str(e))
-        return GraderResult(sufficient=False, reason=f"Grader error: {str(e)}")
+        return GraderResult(sufficient=False, reason=f"Grader LLM error: {e}", answer="")
