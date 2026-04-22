@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Any
-from src.__init__ import log 
+import structlog
+
+log = structlog.get_logger()
 
 class RawGraphEntity(BaseModel):
     """This tells us about one name or thing we found in a small piece of text, before we check if we already found it before."""

@@ -27,7 +27,7 @@ from documentRetrieve.prompts.answer_generator import build_final_answer_prompt
 
 log = structlog.get_logger()
 
-_CHUNK_VECTOR_INDEX = "chunk_embedding_index"
+_CHUNK_VECTOR_INDEX = "chunk_vector_index"  # must match _INDEX_NAME in ingestion.py
 
 
 def _get_neo4j_client(config: RunnableConfig):

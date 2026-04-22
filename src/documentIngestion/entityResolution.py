@@ -3,12 +3,12 @@ from typing import Any
 from openai import AsyncOpenAI
 from rapidfuzz import fuzz
 
-from src.documentIngestion.models.graphExtractionModels import EntityResolutionDecision
-from src.documentIngestion.prompts.graph.prompts_for_checking_if_two_names_are_the_same import (
+from documentIngestion.models.graphExtractionModels import EntityResolutionDecision
+from documentIngestion.prompts.graph.prompts_for_checking_if_two_names_are_the_same import (
     SYSTEM_PROMPT,
     USER_PROMPT_TEMPLATE,
 )
-from src.providers.llmProvider import DEFAULT_MODEL
+from providers.llmProvider import DEFAULT_MODEL
 
 
 def group_entities_by_normalized_name(raw_entity_names: list[str]) -> dict[str, list[str]]:

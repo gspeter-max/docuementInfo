@@ -1,28 +1,28 @@
 import asyncio
 from typing import Any
 import structlog
-from src.documentIngestion.contextual_retrieval import build_contextualized_document
-from src.providers.llmProvider import build_mistral_client
-from src.providers.embeddingModelProvider import embeddingModel
-from src.db.neo4j import Neo4jClient
-from src.db.neo4j.cypherQuerys import (
-    create_vector_index, 
+from documentIngestion.contextual_retrieval import build_contextualized_document
+from providers.llmProvider import build_mistral_client
+from providers.embeddingModelProvider import embeddingModel
+from db.neo4j import Neo4jClient
+from db.neo4j.cypherQuerys import (
+    create_vector_index,
     save_chunk,
     save_document_node,
     save_entity_nodes_and_relationships
 )
-from src.documentIngestion.graphExtraction import extract_graph_data_from_chunk
-from src.documentIngestion.entityResolution import (
+from documentIngestion.graphExtraction import extract_graph_data_from_chunk
+from documentIngestion.entityResolution import (
     group_entities_by_normalized_name,
     find_fuzzy_merge_candidates,
     split_clear_cases_from_ambiguous_cases,
     resolve_ambiguous_entity_pairs,
 )
-from src.documentIngestion.graphPersistence import (
+from documentIngestion.graphPersistence import (
     rewrite_graph_results_to_canonical_entities,
     build_neo4j_graph_write_payload,
 )
-from src.config import jina_api_key, neo4j_uri, neo4j_user, neo4j_password
+from config import jina_api_key, neo4j_uri, neo4j_user, neo4j_password
 
 log = structlog.get_logger(__name__)
 
