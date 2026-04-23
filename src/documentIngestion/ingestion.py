@@ -246,10 +246,19 @@ async def ingest_document_graph(file_path: str) -> dict[str, int | str]:
     Returns:
         A summary dict with ingestion stats (entity counts, relationship count).
     """
+    log.info("Starting document ingestion pipeline", file_path=file_path)
+    
     doc = await build_contextualized_document(file_path=file_path, client=await build_mistral_client())
+    log.info("Document parsed and chunked", num_chunks=len(doc["chunks"]), document_id=doc["document_id"])
+    
     embeddings = await build_contextualized_chunk_embeddings(doc["chunks"])
+    log.info("Embeddings generated for chunks", num_embeddings=len(embeddings))
+    
     raw_results = await extract_chunk_graph_data_in_parallel(doc["chunks"])
+    log.info("Graph data extracted from chunks via LLM", num_results=len(raw_results))
+    
     resolution_result = await resolve_entities_for_graph(raw_results)
+    log.info("Entity resolution complete", num_canonical_names=len(resolution_result["canonical_name_by_raw_name"]))
     
     canonical_payload = rewrite_graph_results_to_canonical_entities(
         raw_results,
@@ -262,11 +271,13 @@ async def ingest_document_graph(file_path: str) -> dict[str, int | str]:
         canonical_payload.entities,
         canonical_payload.relationships,
     )
+    log.info("Neo4j graph write payload prepared")
     
     await persist_document_graph(
         doc, 
         embeddings, 
         graph_write_payload
     )
+    log.info("Document successfully persisted to Neo4j graph database")
     
     return build_ingestion_summary_response(doc, canonical_payload)
