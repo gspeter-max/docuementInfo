@@ -8,7 +8,7 @@ import structlog
 from fastapi import APIRouter
 
 from app.models.retrieveModels import QueryRequest, QueryResponse
-from src.documentRetrieve.retrieve import handle_query
+from documentRetrieve.retrieve import handle_query
 
 log = structlog.get_logger()
 

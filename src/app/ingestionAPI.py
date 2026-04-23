@@ -8,7 +8,7 @@ import structlog
 from fastapi import APIRouter
 
 from app.models.ingestionModels import IngestionRequest, IngestionResponse
-from src.documentIngestion.ingestion import ingest_document_graph
+from documentIngestion.ingestion import ingest_document_graph
 
 log = structlog.get_logger()
 
